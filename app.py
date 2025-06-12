@@ -10,11 +10,20 @@ static_dir = os.path.abspath('app/static')
 app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
 app.secret_key = "chronis_gizli_anahtar"  # Gerçek uygulamada değiştirin
 
+# Global değişken olarak Docker istemcisini tanımla
+client = None
+
 # Docker istemcisini başlat
 try:
-    client = docker.from_env()
+    # Unix socket üzerinden Docker'a bağlan
+    client = docker.DockerClient(base_url='unix://var/run/docker.sock')
+    # Bağlantıyı test et
+    client.ping()
+    print("Docker bağlantısı başarılı")
 except Exception as e:
     print(f"Docker bağlantısı kurulamadı: {e}")
+    # Yine de bir istemci oluştur, bazı durumlarda lazy loading çalışabilir
+    client = docker.DockerClient(base_url='unix://var/run/docker.sock')
 
 @app.route('/')
 def index():

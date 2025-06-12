@@ -1,0 +1,147 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3">Volume Listesi</h1>
+        <p class="text-muted">Tüm Docker volume'larınızı görüntüleyin ve yönetin</p>
+    </div>
+    <div>
+        <div class="input-group">
+            <input type="text" id="volumeSearch" class="form-control" placeholder="Ara...">
+            <button class="btn btn-primary" type="button" id="refreshBtn">
+                <i class="fas fa-sync-alt"></i> Yenile
+            </button>
+            <button class="btn btn-success" type="button" data-bs-toggle="modal" data-bs-target="#createVolumeModal">
+                <i class="fas fa-plus"></i> Volume Oluştur
+            </button>
+        </div>
+    </div>
+</div>
+
+{% if error %}
+<div class="alert alert-danger">
+    <strong>Hata:</strong> {{ error }}
+</div>
+{% endif %}
+
+<div class="card bg-dark text-white">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-dark table-hover">
+                <thead>
+                    <tr>
+                        <th scope="col">
+                            <input type="checkbox" class="form-check-input" id="selectAll">
+                        </th>
+                        <th scope="col">İsim</th>
+                        <th scope="col">Sürücü</th>
+                        <th scope="col">Bağlama Noktası</th>
+                        <th scope="col">Oluşturuldu</th>
+                        <th scope="col">İşlemler</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for volume in volumes %}
+                    <tr>
+                        <td>
+                            <input type="checkbox" class="form-check-input volume-check" value="{{ volume.id }}">
+                        </td>
+                        <td>{{ volume.name }}</td>
+                        <td>{{ volume.attrs.Driver }}</td>
+                        <td>{{ volume.attrs.Mountpoint }}</td>
+                        <td>{{ volume.attrs.CreatedAt.split('T')[0] if volume.attrs.CreatedAt else '-' }}</td>
+                        <td>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-secondary dropdown-toggle" type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="fas fa-ellipsis-v"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="dropdownMenuButton1">
+                                    <li><a class="dropdown-item" href="#">Detaylar</a></li>
+                                    <li><a class="dropdown-item" href="#">Veri Görüntüle</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <form action="#" method="POST" class="d-inline">
+                                            <button type="submit" class="dropdown-item text-danger">Sil</button>
+                                        </form>
+                                    </li>
+                                </ul>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center">Hiç volume bulunamadı.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Volume Oluşturma Modal -->
+<div class="modal fade" id="createVolumeModal" tabindex="-1" aria-labelledby="createVolumeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark text-white">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createVolumeModalLabel">Yeni Volume Oluştur</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Kapat"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createVolumeForm">
+                    <div class="mb-3">
+                        <label for="volumeName" class="form-label">Volume İsmi</label>
+                        <input type="text" class="form-control" id="volumeName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="volumeDriver" class="form-label">Sürücü</label>
+                        <select class="form-select" id="volumeDriver">
+                            <option value="local" selected>local</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                <button type="button" class="btn btn-primary" id="createVolumeBtn">Oluştur</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Volume arama
+        document.getElementById('volumeSearch').addEventListener('keyup', function() {
+            const searchTerm = this.value.toLowerCase();
+            const rows = document.querySelectorAll('tbody tr');
+            
+            rows.forEach(row => {
+                const volumeName = row.querySelector('td:nth-child(2)').textContent.toLowerCase();
+                
+                if (volumeName.includes(searchTerm)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        });
+        
+        // Yenile butonu
+        document.getElementById('refreshBtn').addEventListener('click', function() {
+            window.location.reload();
+        });
+        
+        // Tümünü seç
+        document.getElementById('selectAll').addEventListener('change', function() {
+            const isChecked = this.checked;
+            document.querySelectorAll('.volume-check').forEach(checkbox => {
+                checkbox.checked = isChecked;
+            });
+        });
+    });
+</script>
+{% endblock %} 
