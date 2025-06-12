@@ -15,15 +15,15 @@ client = None
 
 # Docker istemcisini başlat
 try:
-    # Unix socket üzerinden Docker'a bağlan
-    client = docker.DockerClient(base_url='unix://var/run/docker.sock')
+    # Docker API ile bağlantı kur - başka bir yöntem deneyelim
+    import docker.utils
+    client = docker.from_env()
     # Bağlantıyı test et
     client.ping()
     print("Docker bağlantısı başarılı")
 except Exception as e:
     print(f"Docker bağlantısı kurulamadı: {e}")
-    # Yine de bir istemci oluştur, bazı durumlarda lazy loading çalışabilir
-    client = docker.DockerClient(base_url='unix://var/run/docker.sock')
+    client = None
 
 @app.route('/')
 def index():
@@ -44,23 +44,26 @@ def dashboard():
     }
     
     try:
-        # Docker istatistikleri
-        containers = client.containers.list(all=True)
-        running_containers = [c for c in containers if c.status == 'running']
-        images = client.images.list()
-        volumes = client.volumes.list()
-        networks = client.networks.list()
-        
-        stats = {
-            'containers': {
-                'total': len(containers),
-                'running': len(running_containers),
-                'stopped': len(containers) - len(running_containers)
-            },
-            'images': len(images),
-            'volumes': len(volumes),
-            'networks': len(networks)
-        }
+        if client:
+            # Docker istatistikleri
+            containers = client.containers.list(all=True)
+            running_containers = [c for c in containers if c.status == 'running']
+            images = client.images.list()
+            volumes = client.volumes.list()
+            networks = client.networks.list()
+            
+            stats = {
+                'containers': {
+                    'total': len(containers),
+                    'running': len(running_containers),
+                    'stopped': len(containers) - len(running_containers)
+                },
+                'images': len(images),
+                'volumes': len(volumes),
+                'networks': len(networks)
+            }
+        else:
+            flash("Docker bağlantısı kurulamadı. Mock veri gösteriliyor.", "error")
         
         return render_template('dashboard.html', stats=stats)
     except Exception as e:
