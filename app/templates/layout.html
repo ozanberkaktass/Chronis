@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="tr" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -59,6 +59,25 @@
             </button>
             <h4 class="page-title">{{ title|default('Dashboard') }}</h4>
             <div class="d-flex align-items-center gap-3">
+                <!-- Dil Seçici -->
+                <div class="language-selector">
+                    <select id="languageSelector" class="form-select form-select-sm">
+                        <option value="tr" selected>Türkçe</option>
+                        <option value="en">English</option>
+                        <option value="de">Deutsch</option>
+                        <option value="fr">Français</option>
+                    </select>
+                </div>
+                
+                <!-- Tema Değiştirici -->
+                <div class="theme-switcher">
+                    <label for="themeSwitch"><i class="fas fa-moon"></i></label>
+                    <label class="switch">
+                        <input type="checkbox" id="themeSwitch">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                
                 <a href="#" class="btn btn-sm btn-dark" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Bildirimleri göster">
                     <i class="fas fa-bell"></i>
                 </a>
@@ -67,10 +86,10 @@
                         <i class="fas fa-user-circle me-1"></i> Admin
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
-                        <li><a class="dropdown-item" href="#"><i class="fas fa-cog me-2"></i> Ayarlar</a></li>
-                        <li><a class="dropdown-item" href="#"><i class="fas fa-history me-2"></i> İşlem Geçmişi</a></li>
+                        <li><a class="dropdown-item" href="#"><i class="fas fa-cog me-2"></i> <span class="menu-settings">Ayarlar</span></a></li>
+                        <li><a class="dropdown-item" href="#"><i class="fas fa-history me-2"></i> <span class="menu-history">İşlem Geçmişi</span></a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="#"><i class="fas fa-sign-out-alt me-2"></i> Çıkış</a></li>
+                        <li><a class="dropdown-item" href="#"><i class="fas fa-sign-out-alt me-2"></i> <span class="menu-logout">Çıkış</span></a></li>
                     </ul>
                 </div>
             </div>
@@ -124,6 +143,81 @@
                     sidebar.classList.remove('show');
                 }
             });
+            
+            // Tema değiştirici
+            const themeSwitch = document.getElementById('themeSwitch');
+            const htmlElement = document.documentElement;
+            const themeModeIcon = document.querySelector('.theme-switcher label i');
+            
+            // Kaydedilmiş tema tercihini kontrol et
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme) {
+                htmlElement.setAttribute('data-theme', savedTheme);
+                if (savedTheme === 'light') {
+                    themeSwitch.checked = true;
+                    themeModeIcon.classList.replace('fa-moon', 'fa-sun');
+                }
+            }
+            
+            // Tema değiştirme işlevi
+            themeSwitch.addEventListener('change', function() {
+                if (this.checked) {
+                    htmlElement.setAttribute('data-theme', 'light');
+                    themeModeIcon.classList.replace('fa-moon', 'fa-sun');
+                    localStorage.setItem('theme', 'light');
+                } else {
+                    htmlElement.setAttribute('data-theme', 'dark');
+                    themeModeIcon.classList.replace('fa-sun', 'fa-moon');
+                    localStorage.setItem('theme', 'dark');
+                }
+            });
+            
+            // Dil değiştirici
+            const languageSelector = document.getElementById('languageSelector');
+            
+            // Kaydedilmiş dil tercihini kontrol et
+            const savedLanguage = localStorage.getItem('language');
+            if (savedLanguage) {
+                languageSelector.value = savedLanguage;
+                loadTranslations(savedLanguage);
+            }
+            
+            // Dil değiştirme işlevi
+            languageSelector.addEventListener('change', function() {
+                const selectedLanguage = this.value;
+                localStorage.setItem('language', selectedLanguage);
+                loadTranslations(selectedLanguage);
+            });
+            
+            // Çevirileri yükle
+            function loadTranslations(lang) {
+                fetch('/static/js/translations/' + lang + '.json')
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Çeviri dosyası bulunamadı');
+                        }
+                        return response.json();
+                    })
+                    .then(translations => {
+                        // Çevirileri uygula
+                        document.querySelectorAll('[data-i18n]').forEach(element => {
+                            const key = element.getAttribute('data-i18n');
+                            if (translations[key]) {
+                                element.textContent = translations[key];
+                            }
+                        });
+                        
+                        // Menü öğelerini çevir
+                        if (translations.menu) {
+                            document.querySelector('.menu-settings').textContent = translations.menu.settings || 'Ayarlar';
+                            document.querySelector('.menu-history').textContent = translations.menu.history || 'İşlem Geçmişi';
+                            document.querySelector('.menu-logout').textContent = translations.menu.logout || 'Çıkış';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Çeviri yükleme hatası:', error);
+                    });
+            }
         });
     </script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>

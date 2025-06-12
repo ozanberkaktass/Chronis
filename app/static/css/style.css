@@ -19,6 +19,30 @@
     --sidebar-width: 250px;
     --sidebar-collapsed-width: 70px;
     --transition-speed: 0.3s;
+
+    /* Koyu tema (varsayılan) */
+    --primary-bg: #0f172a;
+    --secondary-bg: #1e293b;
+    --card-bg: #1e293b;
+    --text-color: #f8fafc;
+    --accent-color: #6366f1;
+    --accent-hover: #4f46e5;
+}
+
+/* Açık tema */
+[data-theme="light"] {
+    --primary-bg: #f8fafc;
+    --secondary-bg: #f1f5f9;
+    --card-bg: #ffffff;
+    --text-color: #0f172a;
+    --text-muted: #64748b;
+    --border-color: #e2e8f0;
+    --accent-color: #4f46e5;
+    --accent-hover: #4338ca;
+    --success-color: #059669;
+    --danger-color: #dc2626;
+    --warning-color: #d97706;
+    --info-color: #2563eb;
 }
 
 * {
@@ -31,8 +55,8 @@ body {
     padding: 0;
     height: 100vh;
     overflow-x: hidden;
-    background-color: var(--bg-dark);
-    color: var(--text-light);
+    background-color: var(--primary-bg);
+    color: var(--text-color);
     line-height: 1.5;
 }
 
@@ -44,7 +68,7 @@ body {
 
 /* Sidebar Stili */
 .sidebar {
-    background-color: var(--bg-dark-secondary);
+    background-color: var(--secondary-bg);
     min-height: 100vh;
     width: var(--sidebar-width);
     position: fixed;
@@ -137,7 +161,7 @@ body {
 }
 
 .navbar {
-    background-color: var(--bg-dark);
+    background-color: var(--secondary-bg);
     border-bottom: 1px solid var(--border-color);
     padding: 1rem 1.5rem;
     display: flex;
@@ -159,7 +183,7 @@ body {
 
 /* Kartlar */
 .card {
-    background-color: var(--bg-dark-secondary);
+    background-color: var(--card-bg);
     border: none;
     border-radius: 12px;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
@@ -168,7 +192,7 @@ body {
 }
 
 .card-header {
-    background-color: var(--bg-dark-secondary);
+    background-color: var(--secondary-bg);
     border-bottom: 1px solid var(--border-color);
     padding: 1.25rem;
     font-weight: 600;
@@ -183,7 +207,7 @@ body {
 .table {
     width: 100%;
     margin-bottom: 0;
-    color: var(--text-light);
+    color: var(--text-color);
     vertical-align: top;
     border-color: var(--border-color);
 }
@@ -257,8 +281,9 @@ body {
 }
 
 .btn-dark {
-    background-color: var(--bg-dark-tertiary);
-    border-color: var(--bg-dark-tertiary);
+    background-color: var(--secondary-bg);
+    border-color: var(--border-color);
+    color: var(--text-color);
 }
 
 .btn-outline-light {
@@ -273,19 +298,19 @@ body {
 
 /* Form kontrolleri */
 .form-control {
-    background-color: var(--bg-dark-tertiary);
+    background-color: var(--secondary-bg);
     border: 1px solid var(--border-color);
-    color: var(--text-light);
+    color: var(--text-color);
     border-radius: 8px;
     padding: 0.6rem 1rem;
     transition: all 0.2s;
 }
 
 .form-control:focus {
-    background-color: var(--bg-dark-tertiary);
-    border-color: var(--primary-color);
-    color: var(--text-light);
-    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
+    background-color: var(--secondary-bg);
+    border-color: var(--accent-color);
+    color: var(--text-color);
+    box-shadow: 0 0 0 0.2rem rgba(99, 102, 241, 0.25);
 }
 
 .form-control::placeholder {
@@ -333,7 +358,7 @@ body {
 
 /* Dropdown */
 .dropdown-menu {
-    background-color: var(--bg-dark-secondary);
+    background-color: var(--secondary-bg);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
@@ -358,7 +383,7 @@ body {
 
 /* Modal */
 .modal-content {
-    background-color: var(--bg-dark-secondary);
+    background-color: var(--secondary-bg);
     border: none;
     border-radius: 12px;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
@@ -398,7 +423,7 @@ body {
     border-radius: 12px;
     padding: 1.5rem;
     margin-bottom: 1.5rem;
-    background-color: var(--bg-dark-secondary);
+    background-color: var(--card-bg);
     display: flex;
     align-items: center;
     transition: transform 0.2s;
@@ -569,4 +594,77 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
     background: var(--border-color);
+}
+
+/* Tema değiştirici bileşeni */
+.theme-switcher {
+    display: flex;
+    align-items: center;
+    margin-right: 15px;
+}
+
+.theme-switcher label {
+    margin-right: 8px;
+    margin-bottom: 0;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 20px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--text-muted);
+    transition: .4s;
+    border-radius: 20px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 2px;
+    bottom: 2px;
+    background-color: var(--primary-bg);
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: var(--accent-color);
+}
+
+input:checked + .slider:before {
+    transform: translateX(20px);
+}
+
+/* Dil seçici stil */
+.language-selector {
+    margin-right: 15px;
+}
+
+.language-selector select {
+    background-color: var(--secondary-bg);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 0.85rem;
 } 

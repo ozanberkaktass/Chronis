@@ -2,8 +2,8 @@
 
 {% block content %}
 <div class="dashboard-header mb-4">
-    <h1 class="h3 mb-1">Docker Ortamı</h1>
-    <p class="text-muted">Sistem kaynaklarınızı ve Docker nesnelerinizi izleyin</p>
+    <h1 class="h3 mb-1" data-i18n="docker_env">Docker Ortamı</h1>
+    <p class="text-muted" data-i18n="resources">Sistem kaynaklarınızı ve Docker nesnelerinizi izleyin</p>
 </div>
 
 <div class="row">
@@ -14,10 +14,10 @@
             </div>
             <div class="stat-content">
                 <h2 class="stat-value">{{ stats.containers.total }}</h2>
-                <p class="stat-label">Containers</p>
+                <p class="stat-label" data-i18n="containers">Containers</p>
                 <div class="d-flex mt-2">
-                    <span class="stat-tag green">{{ stats.containers.running }} çalışıyor</span>
-                    <span class="stat-tag red">{{ stats.containers.stopped }} durmuş</span>
+                    <span class="stat-tag green"><span>{{ stats.containers.running }}</span> <span data-i18n="running">çalışıyor</span></span>
+                    <span class="stat-tag red"><span>{{ stats.containers.stopped }}</span> <span data-i18n="stopped">durmuş</span></span>
                 </div>
             </div>
         </div>
@@ -30,7 +30,7 @@
             </div>
             <div class="stat-content">
                 <h2 class="stat-value">{{ stats.images }}</h2>
-                <p class="stat-label">Images</p>
+                <p class="stat-label" data-i18n="images">Images</p>
             </div>
         </div>
     </div>
@@ -42,7 +42,7 @@
             </div>
             <div class="stat-content">
                 <h2 class="stat-value">{{ stats.volumes }}</h2>
-                <p class="stat-label">Volumes</p>
+                <p class="stat-label" data-i18n="volumes">Volumes</p>
             </div>
         </div>
     </div>
@@ -54,7 +54,7 @@
             </div>
             <div class="stat-content">
                 <h2 class="stat-value">{{ stats.networks }}</h2>
-                <p class="stat-label">Networks</p>
+                <p class="stat-label" data-i18n="networks">Networks</p>
             </div>
         </div>
     </div>
@@ -64,7 +64,7 @@
     <div class="col-lg-6">
         <div class="card mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0">Sistem Bilgileri</h5>
+                <h5 class="card-title mb-0" data-i18n="system_info">Sistem Bilgileri</h5>
                 <button class="btn btn-sm btn-dark" id="refreshSystemInfo">
                     <i class="fas fa-sync-alt"></i>
                 </button>
@@ -74,7 +74,7 @@
                     <table class="table">
                         <tbody>
                             <tr>
-                                <th><i class="fas fa-server me-2"></i> Ortam</th>
+                                <th><i class="fas fa-server me-2"></i> <span data-i18n="environment">Ortam</span></th>
                                 <td class="text-end">local</td>
                             </tr>
                             <tr>
@@ -82,11 +82,11 @@
                                 <td class="text-end">4 CPU</td>
                             </tr>
                             <tr>
-                                <th><i class="fas fa-memory me-2"></i> Bellek</th>
+                                <th><i class="fas fa-memory me-2"></i> <span data-i18n="memory">Bellek</span></th>
                                 <td class="text-end">33.7 GB</td>
                             </tr>
                             <tr>
-                                <th><i class="fas fa-link me-2"></i> Socket</th>
+                                <th><i class="fas fa-link me-2"></i> <span data-i18n="socket">Socket</span></th>
                                 <td class="text-end">/var/run/docker.sock</td>
                             </tr>
                         </tbody>
@@ -99,13 +99,13 @@
     <div class="col-lg-6">
         <div class="card mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0">Sistem Durumu</h5>
+                <h5 class="card-title mb-0" data-i18n="system_status">Sistem Durumu</h5>
                 <div>
                     <span class="badge bg-success me-2">
-                        <i class="fas fa-check-circle me-1"></i> Docker Erişimi
+                        <i class="fas fa-check-circle me-1"></i> <span data-i18n="docker_access">Docker Erişimi</span>
                     </span>
                     <span class="badge bg-success">
-                        <i class="fas fa-check-circle me-1"></i> API Bağlantısı
+                        <i class="fas fa-check-circle me-1"></i> <span data-i18n="api_connection">API Bağlantısı</span>
                     </span>
                 </div>
             </div>
@@ -120,9 +120,9 @@
     <div class="col-12">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0">Son Etkinlikler</h5>
+                <h5 class="card-title mb-0" data-i18n="recent_activities">Son Etkinlikler</h5>
                 <a href="#" class="btn btn-sm btn-dark" id="refreshEvents">
-                    <i class="fas fa-history me-1"></i> Tümünü Gör
+                    <i class="fas fa-history me-1"></i> <span data-i18n="show_all">Tümünü Gör</span>
                 </a>
             </div>
             <div class="card-body p-0">
@@ -130,10 +130,10 @@
                     <table class="table" id="eventsTable">
                         <thead>
                             <tr>
-                                <th>Zaman</th>
-                                <th>Olay</th>
-                                <th>Kaynak</th>
-                                <th>Durum</th>
+                                <th data-i18n="time">Zaman</th>
+                                <th data-i18n="event">Olay</th>
+                                <th data-i18n="source">Kaynak</th>
+                                <th data-i18n="status">Durum</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -141,19 +141,19 @@
                                 <td>12:45:12</td>
                                 <td>Container başlatıldı</td>
                                 <td>chronis</td>
-                                <td><span class="badge bg-success">Başarılı</span></td>
+                                <td><span class="badge bg-success" data-i18n="success">Başarılı</span></td>
                             </tr>
                             <tr>
                                 <td>12:42:30</td>
                                 <td>Image indirildi</td>
                                 <td>nginx:latest</td>
-                                <td><span class="badge bg-success">Başarılı</span></td>
+                                <td><span class="badge bg-success" data-i18n="success">Başarılı</span></td>
                             </tr>
                             <tr>
                                 <td>12:40:15</td>
                                 <td>Container oluşturuldu</td>
                                 <td>chronis</td>
-                                <td><span class="badge bg-success">Başarılı</span></td>
+                                <td><span class="badge bg-success" data-i18n="success">Başarılı</span></td>
                             </tr>
                         </tbody>
                     </table>
@@ -174,7 +174,7 @@
             labels: [],  // Dinamik olarak doldurulacak
             datasets: [
                 {
-                    label: 'CPU Kullanımı (%)',
+                    label: document.querySelector('[data-i18n="cpu_usage"]')?.textContent || 'CPU Kullanımı (%)',
                     data: [],  // Dinamik olarak doldurulacak
                     borderColor: '#6366f1',
                     backgroundColor: 'rgba(99, 102, 241, 0.1)',
@@ -183,7 +183,7 @@
                     tension: 0.4
                 },
                 {
-                    label: 'Bellek Kullanımı (%)',
+                    label: document.querySelector('[data-i18n="memory_usage"]')?.textContent || 'Bellek Kullanımı (%)',
                     data: [],  // Dinamik olarak doldurulacak
                     borderColor: '#10b981',
                     backgroundColor: 'rgba(16, 185, 129, 0.1)',
@@ -262,11 +262,14 @@
             
             events.forEach(event => {
                 const tr = document.createElement('tr');
+                const successText = document.querySelector('[data-i18n="success"]')?.textContent || 'Başarılı';
+                const errorText = document.querySelector('[data-i18n="error"]')?.textContent || 'Hata';
+                
                 tr.innerHTML = `
                     <td>${event.time}</td>
                     <td>${event.event}</td>
                     <td>${event.source}</td>
-                    <td><span class="badge bg-${event.status === 'success' ? 'success' : 'danger'}">${event.status === 'success' ? 'Başarılı' : 'Hata'}</span></td>
+                    <td><span class="badge bg-${event.status === 'success' ? 'success' : 'danger'}">${event.status === 'success' ? successText : errorText}</span></td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -301,8 +304,8 @@
                 .then(data => {
                     // Container, image, volume, network sayılarını güncelle
                     document.querySelector('.stat-card.containers .stat-value').textContent = data.containers.total;
-                    document.querySelector('.stat-card.containers .stat-tag.green').textContent = `${data.containers.running} çalışıyor`;
-                    document.querySelector('.stat-card.containers .stat-tag.red').textContent = `${data.containers.stopped} durmuş`;
+                    document.querySelector('.stat-card.containers .stat-tag.green span:first-child').textContent = data.containers.running;
+                    document.querySelector('.stat-card.containers .stat-tag.red span:first-child').textContent = data.containers.stopped;
                     document.querySelector('.stat-card.images .stat-value').textContent = data.images;
                     document.querySelector('.stat-card.volumes .stat-value').textContent = data.volumes;
                     document.querySelector('.stat-card.networks .stat-value').textContent = data.networks;
