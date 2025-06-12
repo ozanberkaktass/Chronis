@@ -2,35 +2,92 @@
 
 {% block content %}
 <div class="dashboard-header mb-4">
-    <h1 class="h3">Dashboard</h1>
-    <p class="text-muted">Docker ortamınızın genel durumu</p>
+    <h1 class="h3 mb-1">Docker Ortamı</h1>
+    <p class="text-muted">Sistem kaynaklarınızı ve Docker nesnelerinizi izleyin</p>
 </div>
 
 <div class="row">
-    <div class="col-md-6 mb-4">
-        <div class="card bg-dark text-white">
-            <div class="card-header">
-                <h5 class="card-title mb-0">Ortam Bilgisi</h5>
+    <div class="col-lg-3 col-md-6">
+        <div class="stat-card containers">
+            <div class="stat-icon">
+                <i class="fas fa-cubes"></i>
+            </div>
+            <div class="stat-content">
+                <h2 class="stat-value">{{ stats.containers.total }}</h2>
+                <p class="stat-label">Containers</p>
+                <div class="d-flex mt-2">
+                    <span class="stat-tag green">{{ stats.containers.running }} çalışıyor</span>
+                    <span class="stat-tag red">{{ stats.containers.stopped }} durmuş</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6">
+        <div class="stat-card images">
+            <div class="stat-icon">
+                <i class="fas fa-layer-group"></i>
+            </div>
+            <div class="stat-content">
+                <h2 class="stat-value">{{ stats.images }}</h2>
+                <p class="stat-label">Images</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6">
+        <div class="stat-card volumes">
+            <div class="stat-icon">
+                <i class="fas fa-database"></i>
+            </div>
+            <div class="stat-content">
+                <h2 class="stat-value">{{ stats.volumes }}</h2>
+                <p class="stat-label">Volumes</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6">
+        <div class="stat-card networks">
+            <div class="stat-icon">
+                <i class="fas fa-project-diagram"></i>
+            </div>
+            <div class="stat-content">
+                <h2 class="stat-value">{{ stats.networks }}</h2>
+                <p class="stat-label">Networks</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-6">
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Sistem Bilgileri</h5>
+                <button class="btn btn-sm btn-dark" id="refreshSystemInfo">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
             </div>
             <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-dark table-hover">
+                    <table class="table">
                         <tbody>
                             <tr>
-                                <td>Ortam</td>
-                                <td>local</td>
+                                <th><i class="fas fa-server me-2"></i> Ortam</th>
+                                <td class="text-end">local</td>
                             </tr>
                             <tr>
-                                <td>CPU</td>
-                                <td>4 CPU</td>
+                                <th><i class="fas fa-microchip me-2"></i> CPU</th>
+                                <td class="text-end">4 CPU</td>
                             </tr>
                             <tr>
-                                <td>Bellek</td>
-                                <td>33.7 GB</td>
+                                <th><i class="fas fa-memory me-2"></i> Bellek</th>
+                                <td class="text-end">33.7 GB</td>
                             </tr>
                             <tr>
-                                <td>URL</td>
-                                <td>/var/run/docker.sock</td>
+                                <th><i class="fas fa-link me-2"></i> Socket</th>
+                                <td class="text-end">/var/run/docker.sock</td>
                             </tr>
                         </tbody>
                     </table>
@@ -38,72 +95,68 @@
             </div>
         </div>
     </div>
+    
+    <div class="col-lg-6">
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Sistem Durumu</h5>
+                <div>
+                    <span class="badge bg-success me-2">
+                        <i class="fas fa-check-circle me-1"></i> Docker Erişimi
+                    </span>
+                    <span class="badge bg-success">
+                        <i class="fas fa-check-circle me-1"></i> API Bağlantısı
+                    </span>
+                </div>
+            </div>
+            <div class="card-body">
+                <canvas id="resourceChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="row">
-    <div class="col-md-3 mb-4">
-        <div class="card bg-dark text-white">
-            <div class="card-body">
-                <div class="d-flex align-items-center">
-                    <div class="rounded-circle bg-primary p-3 me-3">
-                        <i class="fas fa-box fa-2x text-white"></i>
-                    </div>
-                    <div>
-                        <h3 class="mb-0">{{ stats.containers.total }}</h3>
-                        <p class="text-muted mb-0">Containers</p>
-                        <div class="mt-2">
-                            <span class="badge bg-success">{{ stats.containers.running }} çalışıyor</span>
-                            <span class="badge bg-danger">{{ stats.containers.stopped }} durmuş</span>
-                        </div>
-                    </div>
-                </div>
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Son Etkinlikler</h5>
+                <a href="#" class="btn btn-sm btn-dark">
+                    <i class="fas fa-history me-1"></i> Tümünü Gör
+                </a>
             </div>
-        </div>
-    </div>
-    
-    <div class="col-md-3 mb-4">
-        <div class="card bg-dark text-white">
-            <div class="card-body">
-                <div class="d-flex align-items-center">
-                    <div class="rounded-circle bg-info p-3 me-3">
-                        <i class="fas fa-images fa-2x text-white"></i>
-                    </div>
-                    <div>
-                        <h3 class="mb-0">{{ stats.images }}</h3>
-                        <p class="text-muted mb-0">Images</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-3 mb-4">
-        <div class="card bg-dark text-white">
-            <div class="card-body">
-                <div class="d-flex align-items-center">
-                    <div class="rounded-circle bg-warning p-3 me-3">
-                        <i class="fas fa-hdd fa-2x text-white"></i>
-                    </div>
-                    <div>
-                        <h3 class="mb-0">{{ stats.volumes }}</h3>
-                        <p class="text-muted mb-0">Volume</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-3 mb-4">
-        <div class="card bg-dark text-white">
-            <div class="card-body">
-                <div class="d-flex align-items-center">
-                    <div class="rounded-circle bg-danger p-3 me-3">
-                        <i class="fas fa-network-wired fa-2x text-white"></i>
-                    </div>
-                    <div>
-                        <h3 class="mb-0">{{ stats.networks }}</h3>
-                        <p class="text-muted mb-0">Networks</p>
-                    </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Zaman</th>
+                                <th>Olay</th>
+                                <th>Kaynak</th>
+                                <th>Durum</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>12:45:12</td>
+                                <td>Container başlatıldı</td>
+                                <td>chronis</td>
+                                <td><span class="badge bg-success">Başarılı</span></td>
+                            </tr>
+                            <tr>
+                                <td>12:42:30</td>
+                                <td>Image indirildi</td>
+                                <td>nginx:latest</td>
+                                <td><span class="badge bg-success">Başarılı</span></td>
+                            </tr>
+                            <tr>
+                                <td>12:40:15</td>
+                                <td>Container oluşturuldu</td>
+                                <td>chronis</td>
+                                <td><span class="badge bg-success">Başarılı</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -113,15 +166,93 @@
 
 {% block scripts %}
 <script>
-    // Dashboard için özel JavaScript kodları
     document.addEventListener('DOMContentLoaded', function() {
-        // Otomatik yenileme için API'den verileri çekme
+        // Sistem kaynak grafiği
+        const ctx = document.getElementById('resourceChart').getContext('2d');
+        const resourceChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'],
+                datasets: [
+                    {
+                        label: 'CPU Kullanımı (%)',
+                        data: [10, 25, 45, 30, 60, 40],
+                        borderColor: '#6366f1',
+                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4
+                    },
+                    {
+                        label: 'Bellek Kullanımı (%)',
+                        data: [30, 40, 35, 50, 65, 45],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            color: '#f8fafc',
+                            usePointStyle: true,
+                            pointStyle: 'circle'
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            color: 'rgba(148, 163, 184, 0.1)'
+                        },
+                        ticks: {
+                            color: '#94a3b8'
+                        }
+                    },
+                    y: {
+                        grid: {
+                            color: 'rgba(148, 163, 184, 0.1)'
+                        },
+                        ticks: {
+                            color: '#94a3b8'
+                        },
+                        beginAtZero: true,
+                        max: 100
+                    }
+                },
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                }
+            }
+        });
+        
+        // Sistem bilgilerini yenile
+        document.getElementById('refreshSystemInfo').addEventListener('click', function() {
+            this.disabled = true;
+            const icon = this.querySelector('i');
+            icon.classList.add('fa-spin');
+            
+            setTimeout(() => {
+                this.disabled = false;
+                icon.classList.remove('fa-spin');
+            }, 1000);
+        });
+        
+        // İstatistikleri periyodik olarak güncelle
         function refreshStats() {
             fetch('/api/stats')
                 .then(response => response.json())
                 .then(data => {
                     // Verileri güncelle
-                    console.log('Stats güncellenedi:', data);
+                    console.log('Stats güncellendi:', data);
                 })
                 .catch(error => console.error('Stat alınamadı:', error));
         }
