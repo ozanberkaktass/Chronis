@@ -711,5 +711,20 @@ def api_status():
     except Exception as e:
         return jsonify({'status': 'error', 'error': str(e)}), 500
 
+# Tarih biçimlendirme filtresi
+@app.template_filter('format_date')
+def format_date(value, format='%Y-%m-%d %H:%M'):
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        try:
+            value = datetime.datetime.fromisoformat(value.replace('Z', '+00:00'))
+        except (ValueError, TypeError):
+            try:
+                value = datetime.datetime.strptime(value, '%Y-%m-%dT%H:%M:%S.%f')
+            except (ValueError, TypeError):
+                return value
+    return value.strftime(format)
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000) 

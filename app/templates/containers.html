@@ -59,7 +59,7 @@
                             </span>
                         </td>
                         <td>{{ container.ports }}</td>
-                        <td>{{ container.attrs.Created | datetime }}</td>
+                        <td>{{ container.attrs.Created | format_date }}</td>
                         <td class="text-end">
                             <div class="container-controls">
                                 {% if container.status == 'running' %}
