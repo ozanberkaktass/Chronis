@@ -261,27 +261,66 @@ def create_terminal_session(data):
                     port=int(port),
                     username=username,
                     password=password,
-                    timeout=10
+                    timeout=30,
+                    allow_agent=False,
+                    look_for_keys=False
                 )
                 
                 # PTY oluştur
                 transport = ssh_client.get_transport()
+                transport.set_keepalive(60)  # 60 saniyede bir keepalive paketi gönder
+                
                 channel = transport.open_session()
                 channel.get_pty(term='xterm-256color', width=80, height=24)
                 channel.invoke_shell()
                 
+                # Terminal girişi göndermeden önce 1 saniye bekle, bazı SSH sunucuları için faydalı olabilir
+                time.sleep(1)
+                # Başlangıç komutu olarak Enter tuşuna basma (bazı SSH sunucuları için gerekli)
+                channel.send("\r\n")
+                
                 # Terminali okuma işlevi
                 def read_from_ssh(client_sid, ssh_channel):
                     try:
+                        # İlk hoş geldin mesajını okumak için zaman ver
+                        time.sleep(0.5)
+                        
+                        # Başlangıç verilerini okumak için kontrol et
+                        if ssh_channel.recv_ready():
+                            initial_data = ssh_channel.recv(4096).decode('utf-8', errors='ignore')
+                            if initial_data:
+                                print(f"SSH ilk veri alındı ({len(initial_data)} bayt)")
+                                socketio.emit('terminal_output', {'output': initial_data}, namespace='/terminal', room=client_sid)
+                        
+                        # Ana okuma döngüsü
                         while True:
+                            # Bağlantı kesildi mi kontrol et
+                            if ssh_channel.closed or not ssh_channel.get_transport() or not ssh_channel.get_transport().is_active():
+                                print(f"SSH bağlantısı kapandı: {client_sid}")
+                                socketio.emit('connection_error', {'error': 'SSH bağlantısı kapandı'}, 
+                                             namespace='/terminal', room=client_sid)
+                                break
+                            
+                            # Veri var mı kontrol et
                             if ssh_channel.recv_ready():
-                                data = ssh_channel.recv(1024).decode('utf-8', errors='ignore')
-                                if not data:
-                                    break
-                                socketio.emit('terminal_output', {'output': data}, namespace='/terminal', room=client_sid)
-                            time.sleep(0.01)
+                                data = ssh_channel.recv(4096).decode('utf-8', errors='ignore')
+                                if data:
+                                    # Debug için veri içeriğini yazdır
+                                    print(f"SSH veri alındı ({len(data)} bayt): {repr(data)[:50]}...")
+                                    socketio.emit('terminal_output', {'output': data}, namespace='/terminal', room=client_sid)
+                            
+                            # Hata varsa kontrol et
+                            if ssh_channel.recv_stderr_ready():
+                                err_data = ssh_channel.recv_stderr(4096).decode('utf-8', errors='ignore')
+                                if err_data:
+                                    print(f"SSH stderr alındı: {repr(err_data)}")
+                                    socketio.emit('terminal_output', {'output': err_data}, namespace='/terminal', room=client_sid)
+                            
+                            # Küçük bir bekleme ile CPU kullanımını azalt
+                            time.sleep(0.05)
                     except Exception as e:
                         print(f"SSH veri okuma hatası: {str(e)}")
+                        traceback.print_exc()
                         socketio.emit('connection_error', {'error': f'SSH okuma hatası: {str(e)}'},
                                      namespace='/terminal', room=client_sid)
                 
@@ -350,7 +389,7 @@ def create_terminal_session(data):
 @socketio.on('terminal_input', namespace='/terminal')
 def handle_terminal_input(data):
     try:
-        print(f"Terminal input alındı: {data}")
+        print(f"Terminal input alındı: {repr(data)[:50]}...")
         session_id = data.get('session_id')
         input_data = data.get('data')
         
@@ -370,21 +409,35 @@ def handle_terminal_input(data):
             if 'exec_id' in session_info:
                 try:
                     session_info['exec_id'].send(input_data.encode('utf-8'))
+                    print(f"Konteyner veri gönderildi: {repr(input_data)[:30]}...")
                 except Exception as e:
+                    print(f"Konteyner input hatası: {str(e)}")
+                    traceback.print_exc()
                     emit('connection_error', {'error': f'Konteyner input hatası: {str(e)}'})
         
         elif session_info['type'] == 'host':
             if session_info.get('fd'):
                 try:
                     os.write(session_info['fd'], input_data.encode('utf-8'))
+                    print(f"Host veri gönderildi: {repr(input_data)[:30]}...")
                 except Exception as e:
+                    print(f"Host input hatası: {str(e)}")
+                    traceback.print_exc()
                     emit('connection_error', {'error': f'Host input hatası: {str(e)}'})
         
         elif session_info['type'] == 'ssh':
             if 'channel' in session_info:
                 try:
-                    session_info['channel'].send(input_data)
+                    if not isinstance(input_data, bytes):
+                        send_data = input_data.encode('utf-8') if isinstance(input_data, str) else input_data
+                    else:
+                        send_data = input_data
+                    
+                    session_info['channel'].send(send_data)
+                    print(f"SSH veri gönderildi ({len(send_data)} bayt): {repr(input_data)[:30]}...")
                 except Exception as e:
+                    print(f"SSH input hatası: {str(e)}")
+                    traceback.print_exc()
                     emit('connection_error', {'error': f'SSH input hatası: {str(e)}'})
         
         # Kayıt yapılıyorsa verileri ekle
