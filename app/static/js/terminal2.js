@@ -12,28 +12,47 @@ class TerminalManager {
         this.fitAddon = null;
         this.activeSession = null;
         this.socket = null;
-        this.statusIndicator = null;
-        this.connectionLabel = null;
+        this.connectionUrl = null;
         this.debugMode = true; // Hata ayıklama modunu etkinleştir
     }
     
     // Terminal yöneticisini başlat
     init() {
         // DOM elemanlarını al
-        this.statusIndicator = document.getElementById('status-indicator');
-        this.connectionLabel = document.getElementById('connection-label');
+        this.connectionUrl = document.getElementById('connection-url');
         const terminalContainer = document.getElementById('terminal-container');
         
         // Terminal'i oluştur
         this.term = new Terminal({
             cursorBlink: true,
             theme: {
-                background: '#0f1419',
-                foreground: '#f0f0f0'
+                background: '#000000',
+                foreground: '#f0f0f0',
+                cursor: '#ffffff',
+                cursorAccent: '#000000',
+                selection: 'rgba(255, 255, 255, 0.3)',
+                black: '#000000',
+                red: '#cc0000',
+                green: '#4e9a06',
+                yellow: '#c4a000',
+                blue: '#3465a4',
+                magenta: '#75507b',
+                cyan: '#06989a',
+                white: '#d3d7cf',
+                brightBlack: '#555753',
+                brightRed: '#ef2929',
+                brightGreen: '#8ae234',
+                brightYellow: '#fce94f',
+                brightBlue: '#729fcf',
+                brightMagenta: '#ad7fa8',
+                brightCyan: '#34e2e2',
+                brightWhite: '#eeeeec'
             },
             fontSize: 14,
-            fontFamily: 'Courier New, monospace',
-            convertEol: true
+            fontFamily: 'Consolas, "Courier New", monospace',
+            lineHeight: 1.2,
+            convertEol: true,
+            scrollback: 5000
         });
         
         // Terminal eklentileri
@@ -66,13 +85,21 @@ class TerminalManager {
         this.bindEvents();
         
         // Sayfa yüklendiğinde hoş geldin mesajı
-        this.term.writeln('Chronis Terminal2 Uygulamasına Hoş Geldiniz!');
-        this.term.writeln('Bir terminal oturumu başlatmak için "Yeni Oturum" butonuna tıklayın.');
+        this.showWelcomeMessage();
         
         this.resizeTerminal();
         this.setupUIListeners();
         
-        this.log('Terminal yöneticisi başlatıldı');
+        this.log('Terminal2 yöneticisi başlatıldı');
+    }
+    
+    // Hoş geldin mesajı göster
+    showWelcomeMessage() {
+        this.term.writeln('\x1B[1;34mChronis Terminal2\x1B[0m - Web Tabanlı SSH/Container Terminal');
+        this.term.writeln('');
+        this.term.writeln('Bir terminal oturumu başlatmak için sağ üstteki \x1B[1;32m+\x1B[0m butonuna tıklayın.');
+        this.term.writeln('');
+        this.term.writeln('\x1B[2mBağlantı bekleniyor...\x1B[0m');
     }
     
     // Terminal boyutunu ayarla
@@ -128,30 +155,59 @@ class TerminalManager {
                 this.fetchContainers();
             }
         });
+        
+        // Pencere kontrolleri
+        document.getElementById('btn-minimize').addEventListener('click', () => {
+            this.log('Minimize button clicked');
+            // Burada minimize işlevi eklenebilir
+        });
+        
+        document.getElementById('btn-maximize').addEventListener('click', () => {
+            this.toggleFullscreen();
+        });
+        
+        document.getElementById('btn-close').addEventListener('click', () => {
+            if (confirm('Terminal oturumunu kapatmak istediğinize emin misiniz?')) {
+                window.location.href = '/dashboard';
+            }
+        });
+        
+        // Ayarlar butonu
+        document.getElementById('btn-settings').addEventListener('click', () => {
+            this.log('Settings button clicked');
+            // Burada ayarlar menüsü gösterilebilir
+        });
+    }
+    
+    // Tam ekran modunu aç/kapat
+    toggleFullscreen() {
+        const elem = document.documentElement;
+        
+        if (!document.fullscreenElement) {
+            elem.requestFullscreen().catch(err => {
+                this.logError(`Tam ekran hatası: ${err.message}`);
+            });
+        } else {
+            document.exitFullscreen();
+        }
     }
     
     // Socket.io olay işleyicileri
     handleConnect() {
         this.log('Socket.io bağlantısı kuruldu');
-        this.statusIndicator.classList.remove('status-disconnected');
-        this.statusIndicator.classList.add('status-connected');
-        this.connectionLabel.textContent = "Bağlandı";
-        this.term.clear();
-        this.term.writeln('Socket.io bağlantısı kuruldu. Terminal oturumu başlatmak için "Yeni Oturum" butonuna tıklayın.');
+        this.term.writeln('\r\n\x1B[1;32mSocket.io bağlantısı kuruldu.\x1B[0m');
     }
     
     handleDisconnect() {
         this.log('Socket.io bağlantısı kesildi');
-        this.statusIndicator.classList.remove('status-connected');
-        this.statusIndicator.classList.add('status-disconnected');
-        this.connectionLabel.textContent = "Bağlantı kesildi";
-        this.term.writeln('\r\n\nSocket.io bağlantısı kesildi. Sayfa yenilenmeli!');
+        this.term.writeln('\r\n\x1B[1;31mSocket.io bağlantısı kesildi. Sayfa yenilenmeli!\x1B[0m');
         this.activeSession = null;
+        this.updateConnectionUrl('');
     }
     
     handleConnectError(error) {
         this.logError('Socket.io bağlantı hatası:', error);
-        this.term.writeln(`\r\nBağlantı hatası: ${error.message}`);
+        this.term.writeln(`\r\n\x1B[1;31mBağlantı hatası: ${error.message}\x1B[0m`);
     }
     
     handleTerminalOutput(data) {
@@ -163,7 +219,7 @@ class TerminalManager {
     
     handleConnectionError(data) {
         this.logError('Terminal bağlantı hatası:', data);
-        this.term.writeln(`\r\n\nHata: ${data.error}`);
+        this.term.writeln(`\r\n\x1B[1;31mHata: ${data.error}\x1B[0m`);
     }
     
     handleSessionCreated(data) {
@@ -175,7 +231,7 @@ class TerminalManager {
         if (modal) modal.hide();
         
         this.term.clear();
-        this.term.writeln('Terminal oturumu başlatıldı. Bağlantı kuruluyor...');
+        this.term.writeln('\x1B[1;32mTerminal oturumu başlatıldı. Bağlantı kuruluyor...\x1B[0m');
         
         // Oturum oluşturulduktan sonra terminal boyutunu ayarla
         setTimeout(() => {
@@ -186,6 +242,15 @@ class TerminalManager {
                 data: "\r\n"
             });
         }, 500);
+    }
+    
+    // Bağlantı URL'sini güncelle
+    updateConnectionUrl(url) {
+        if (!url) {
+            this.connectionUrl.textContent = 'Bağlı değil';
+            return;
+        }
+        this.connectionUrl.textContent = url;
     }
     
     // Terminal giriş olayı
@@ -215,6 +280,8 @@ class TerminalManager {
             }
             
             this.log('SSH bağlantısı başlatılıyor:', host, port, username);
+            this.updateConnectionUrl(`ssh://${username}@${host}:${port}`);
+            
             this.socket.emit('create_session', {
                 type: 'ssh',
                 host: host,
@@ -231,12 +298,16 @@ class TerminalManager {
             }
             
             this.log('Konteyner bağlantısı başlatılıyor:', containerId);
+            this.updateConnectionUrl(`container://${containerId.substring(0, 12)}`);
+            
             this.socket.emit('create_session', {
                 type: 'container',
                 target: containerId
             });
         } else if (sessionType === 'host') {
             this.log('Yerel host bağlantısı başlatılıyor');
+            this.updateConnectionUrl('local://host');
+            
             this.socket.emit('create_session', {
                 type: 'host'
             });
@@ -244,7 +315,7 @@ class TerminalManager {
         
         // Bağlantı kurulurken mesaj göster
         this.term.clear();
-        this.term.writeln("Bağlantı kuruluyor, lütfen bekleyin...");
+        this.term.writeln("\x1B[1;33mBağlantı kuruluyor, lütfen bekleyin...\x1B[0m");
     }
     
     // Konteynerleri getir
