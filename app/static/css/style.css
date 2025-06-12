@@ -845,4 +845,72 @@ input:checked + .slider:before {
 .table-dark.table-hover tbody tr:hover td {
     background-color: #334155 !important;
     color: #f8fafc !important;
+}
+
+/* Aydınlık modda tüm tablo stilleri tamamen geçersiz kılma */
+[data-theme="light"] table.table-dark,
+[data-theme="light"] .table-dark,
+[data-theme="light"] .table-dark thead,
+[data-theme="light"] .table-dark tbody,
+[data-theme="light"] .table-dark tr,
+[data-theme="light"] .table-dark th,
+[data-theme="light"] .table-dark td {
+    background-color: #ffffff !important;
+    color: #334155 !important;
+    border-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .table-dark thead th {
+    background-color: #f1f5f9 !important;
+    color: #334155 !important;
+    border-color: #e2e8f0 !important;
+}
+
+/* Aydınlık modda tüm tablo hover efektleri */
+[data-theme="light"] .table-dark tbody tr:hover,
+[data-theme="light"] .table-dark.table-hover tbody tr:hover,
+[data-theme="light"] table.table-dark tbody tr:hover,
+[data-theme="light"] table.table-dark.table-hover tbody tr:hover {
+    background-color: #f1f5f9 !important;
+}
+
+[data-theme="light"] .table-dark tbody tr:hover td,
+[data-theme="light"] .table-dark.table-hover tbody tr:hover td,
+[data-theme="light"] table.table-dark tbody tr:hover td,
+[data-theme="light"] table.table-dark.table-hover tbody tr:hover td {
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
+}
+
+/* Zebra stil veya seçili satır düzeltmeleri */
+[data-theme="light"] .table-dark tbody tr:nth-child(odd),
+[data-theme="light"] .table-dark tbody tr:nth-child(even),
+[data-theme="light"] .table-dark tbody tr.selected {
+    background-color: #ffffff !important;
+}
+
+[data-theme="light"] .table-dark tbody tr:nth-child(odd) td,
+[data-theme="light"] .table-dark tbody tr:nth-child(even) td,
+[data-theme="light"] .table-dark tbody tr.selected td {
+    background-color: #ffffff !important;
+    color: #334155 !important;
+}
+
+/* Seçili veya aktif satır düzeltmeleri */
+[data-theme="light"] .table-dark tbody tr.active,
+[data-theme="light"] .table-dark tbody tr.active td {
+    background-color: rgba(79, 70, 229, 0.1) !important;
+    color: #334155 !important;
+}
+
+/* Bootstrap override edilemiyorsa aşağıdaki CSS satırlarını ekleyin */
+[data-theme="light"] tr:hover,
+[data-theme="light"] tbody tr:hover {
+    background-color: #f1f5f9 !important;
+}
+
+[data-theme="light"] tr:hover td,
+[data-theme="light"] tbody tr:hover td {
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
 } 
