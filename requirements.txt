@@ -14,4 +14,5 @@ flask-sqlalchemy==2.5.1
 Flask==2.2.5
 docker-compose==1.29.2
 pyserial==3.5
-eventlet==0.30.2 
+eventlet==0.30.2
+paramiko==2.11.0 

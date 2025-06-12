@@ -16,6 +16,7 @@ import threading
 import eventlet
 from functools import wraps
 import traceback
+import paramiko
 
 # WebSocket için eventlet'i kullan
 eventlet.monkey_patch()
@@ -521,17 +522,25 @@ def create_terminal_session(data):
                 fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 80, 0, 0))
                 
                 # Container exec ile bağlantı kur - burada tam implementasyon gerekiyor
-                def read_from_container():
+                def read_from_container(client_sid, exec_socket):
                     try:
                         while True:
-                            data = exec_id.recv(1024).decode('utf-8', errors='ignore')
+                            data = exec_socket.recv(1024).decode('utf-8', errors='ignore')
                             if not data:
                                 break
-                            emit('terminal_output', {'output': data})
+                            socketio.emit('terminal_output', {'output': data}, namespace='/terminal', room=client_sid)
                     except Exception as e:
-                        emit('connection_error', {'error': f'Okuma hatası: {str(e)}'})
+                        print(f"Konteyner veri okuma hatası: {str(e)}")
+                        socketio.emit('connection_error', {'error': f'Okuma hatası: {str(e)}'}, 
+                                     namespace='/terminal', room=client_sid)
                 
-                threading.Thread(target=read_from_container, daemon=True).start()
+                # İstemci kimliğini thread'e geçir
+                thread = threading.Thread(
+                    target=read_from_container, 
+                    args=(request.sid, exec_id),
+                    daemon=True
+                )
+                thread.start()
                 
             except Exception as e:
                 emit('connection_error', {'error': f'Exec oluşturma hatası: {str(e)}'})
@@ -569,11 +578,80 @@ def create_terminal_session(data):
                 return
         
         elif session_type == 'ssh':
-            # SSH bağlantısı - paramiko veya başka bir kütüphane ile
-            pass
+            # SSH bağlantısı için paramiko kullan
+            try:
+                # SSH istemcisi oluştur
+                ssh_client = paramiko.SSHClient()
+                ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                
+                # Bağlantı kur
+                ssh_client.connect(
+                    hostname=host,
+                    port=int(port),
+                    username=username,
+                    password=password,
+                    timeout=10
+                )
+                
+                # PTY oluştur
+                transport = ssh_client.get_transport()
+                channel = transport.open_session()
+                channel.get_pty(term='xterm-256color', width=80, height=24)
+                channel.invoke_shell()
+                
+                # Terminali okuma işlevi
+                def read_from_ssh(client_sid, ssh_channel):
+                    try:
+                        while True:
+                            if ssh_channel.recv_ready():
+                                data = ssh_channel.recv(1024).decode('utf-8', errors='ignore')
+                                if not data:
+                                    break
+                                socketio.emit('terminal_output', {'output': data}, namespace='/terminal', room=client_sid)
+                            time.sleep(0.01)
+                    except Exception as e:
+                        print(f"SSH veri okuma hatası: {str(e)}")
+                        socketio.emit('connection_error', {'error': f'SSH okuma hatası: {str(e)}'},
+                                     namespace='/terminal', room=client_sid)
+                
+                # İstemci kimliğini thread'e geçir
+                thread = threading.Thread(
+                    target=read_from_ssh,
+                    args=(request.sid, channel),
+                    daemon=True
+                )
+                thread.start()
+                
+                # SSH bilgilerini oturuma kaydet
+                session_info = {
+                    'session_id': session_id,
+                    'type': session_type,
+                    'host': host,
+                    'port': port,
+                    'username': username,
+                    'ssh_client': ssh_client,
+                    'channel': channel,
+                    'thread': thread,
+                    'recording': False,
+                    'start_time': datetime.datetime.now(),
+                    'recording_data': []
+                }
+                terminal_sessions[request.sid] = session_info
+                
+                # Oturum oluşturuldu bilgisi gönder
+                emit('session_created', {'session_id': session_id})
+                
+                print(f"SSH terminal oturumu oluşturuldu: {session_id}")
+                return
+                
+            except Exception as e:
+                emit('connection_error', {'error': f'SSH bağlantı hatası: {str(e)}'})
+                print(f"SSH bağlantı hatası: {str(e)}")
+                traceback.print_exc()
+                return
         
         # Oturum bilgilerini kaydet
-        terminal_sessions[request.sid] = {
+        session_info = {
             'session_id': session_id,
             'type': session_type,
             'target': target,
@@ -631,6 +709,13 @@ def handle_terminal_input(data):
                 except Exception as e:
                     emit('connection_error', {'error': f'Host input hatası: {str(e)}'})
         
+        elif session_info['type'] == 'ssh':
+            if 'channel' in session_info:
+                try:
+                    session_info['channel'].send(input_data)
+                except Exception as e:
+                    emit('connection_error', {'error': f'SSH input hatası: {str(e)}'})
+        
         # Kayıt yapılıyorsa verileri ekle
         if session_info.get('recording', False):
             session_info['recording_data'].append({
@@ -680,6 +765,7 @@ def close_terminal_session(data):
         
         # Oturumu bul
         session_info = None
+        sid_to_remove = None
         for sid, session in terminal_sessions.items():
             if session.get('session_id') == session_id:
                 session_info = session
@@ -710,6 +796,19 @@ def close_terminal_session(data):
                 except:
                     pass
         
+        elif session_info['type'] == 'ssh':
+            if 'channel' in session_info:
+                try:
+                    session_info['channel'].close()
+                except:
+                    pass
+                
+            if 'ssh_client' in session_info:
+                try:
+                    session_info['ssh_client'].close()
+                except:
+                    pass
+        
         # Kayıt yapılıyorsa durdur
         if session_info.get('recording', False):
             session_info['recording'] = False
@@ -728,8 +827,16 @@ def close_terminal_session(data):
                     'frames': session_info.get('recording_data', [])
                 }, f)
         
+        # Thread sonlandır
+        if 'thread' in session_info and session_info['thread'].is_alive():
+            # Thread sonlandırma işlemi burada yapılabilir
+            # Python thread'leri doğrudan kill edilemez, ancak
+            # thread fonksiyonları içinde exit flag kontrol edilebilir
+            pass
+        
         # Oturumu sil
-        terminal_sessions.pop(sid_to_remove, None)
+        if sid_to_remove:
+            terminal_sessions.pop(sid_to_remove, None)
     
     except Exception as e:
         print(f"Oturum kapatma hatası: {str(e)}")
@@ -762,6 +869,67 @@ def start_terminal_recording(data):
         emit('connection_error', {'error': f'Kayıt başlatma hatası: {str(e)}'})
         print(f"Kayıt başlatma hatası: {str(e)}")
         traceback.print_exc()
+
+# Eski "start" olayını yeni "create_session" olayına yönlendir
+@socketio.on('start', namespace='/terminal')
+def legacy_start_terminal(data):
+    """Eski istemci uyumluluğu için start olayını create_session'a yönlendir"""
+    print(f"Eski 'start' olayı alındı, yeni API'ye yönlendiriliyor: {data}")
+    
+    # Veri formatını yeni API'ye uyarla
+    connection_type = data.get('type')
+    
+    new_data = {
+        'type': connection_type
+    }
+    
+    if connection_type == 'container':
+        new_data['target'] = data.get('containerId')
+    elif connection_type == 'ssh':
+        new_data['host'] = data.get('host')
+        new_data['port'] = data.get('port', '22')
+        new_data['username'] = data.get('username')
+        new_data['password'] = data.get('password')
+    
+    # Yeni oturum oluşturma fonksiyonunu çağır
+    create_terminal_session(new_data)
+
+# Eski "data" olayını yeni "terminal_input" olayına yönlendir
+@socketio.on('data', namespace='/terminal')
+def legacy_terminal_input(data):
+    """Eski istemci uyumluluğu için data olayını terminal_input'a yönlendir"""
+    print(f"Eski 'data' olayı alındı, yeni API'ye yönlendiriliyor")
+    
+    # Oturumu bul
+    session_info = terminal_sessions.get(request.sid)
+    if not session_info:
+        print("İstemci için aktif oturum bulunamadı")
+        return
+    
+    # Yeni formatta veriyi gönder
+    handle_terminal_input({
+        'session_id': session_info.get('session_id'),
+        'data': data
+    })
+
+# Eski "resize" olayını yeni "terminal_resize" olayına yönlendir
+@socketio.on('resize', namespace='/terminal')
+def legacy_terminal_resize(data):
+    """Eski istemci uyumluluğu için resize olayını terminal_resize'a yönlendir"""
+    print(f"Eski 'resize' olayı alındı, yeni API'ye yönlendiriliyor")
+    
+    # Oturumu bul
+    session_info = terminal_sessions.get(request.sid)
+    if not session_info:
+        print("İstemci için aktif oturum bulunamadı")
+        return
+    
+    # Yeni formatta veriyi gönder
+    handle_terminal_resize({
+        'session_id': session_info.get('session_id'),
+        'cols': data.get('cols', 80),
+        'rows': data.get('rows', 24)
+    })
 
 # Terminal sayfası
 @app.route('/terminal')
