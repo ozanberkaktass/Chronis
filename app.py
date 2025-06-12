@@ -396,6 +396,9 @@ class DockerCLIClient:
 def connect_to_docker(max_attempts=3, delay=1):
     global docker_client
     
+    # Docker bağlantı hatalarını tutacak liste
+    connection_errors = []
+    
     for attempt in range(max_attempts):
         try:
             # Docker API istemcisini başlat - farklı bağlantı yöntemlerini dene
@@ -406,31 +409,44 @@ def connect_to_docker(max_attempts=3, delay=1):
                 version = docker_client.version()
                 print(f"Docker'a bağlandı: {version.get('Version', 'bilinmiyor')}")
                 return True
-            except:
+            except Exception as env_error:
+                connection_errors.append(f"Varsayılan bağlantı hatası: {str(env_error)}")
                 # Unix soket yöntemi dene (Linux)
                 try:
                     docker_client = docker.DockerClient(base_url='unix:///var/run/docker.sock')
                     version = docker_client.version()
                     print(f"Docker'a Unix soket ile bağlandı: {version.get('Version', 'bilinmiyor')}")
                     return True
-                except:
+                except Exception as unix_error:
+                    connection_errors.append(f"Unix soket bağlantı hatası: {str(unix_error)}")
                     # Windows named pipe dene
                     try:
                         docker_client = docker.DockerClient(base_url='npipe:////./pipe/docker_engine')
                         version = docker_client.version()
                         print(f"Docker'a Windows pipe ile bağlandı: {version.get('Version', 'bilinmiyor')}")
                         return True
-                    except:
+                    except Exception as win_error:
+                        connection_errors.append(f"Windows pipe bağlantı hatası: {str(win_error)}")
                         # TCP ile dene
-                        docker_client = docker.DockerClient(base_url='tcp://localhost:2375')
-                        version = docker_client.version()
-                        print(f"Docker'a TCP ile bağlandı: {version.get('Version', 'bilinmiyor')}")
-                        return True
+                        try:
+                            docker_client = docker.DockerClient(base_url='tcp://localhost:2375')
+                            version = docker_client.version()
+                            print(f"Docker'a TCP ile bağlandı: {version.get('Version', 'bilinmiyor')}")
+                            return True
+                        except Exception as tcp_error:
+                            connection_errors.append(f"TCP bağlantı hatası: {str(tcp_error)}")
+                            raise Exception("Tüm Docker bağlantı yöntemleri başarısız oldu")
                 
         except Exception as e:
-            print(f"Docker bağlantı hatası (deneme {attempt+1}/{max_attempts}): {str(e)}")
+            error_msg = f"Docker bağlantı hatası (deneme {attempt+1}/{max_attempts}): {str(e)}"
+            print(error_msg)
             if attempt < max_attempts - 1:
                 time.sleep(delay)
+    
+    # Hata detaylarını yazdır
+    print("Docker bağlantı hataları detayları:")
+    for i, error in enumerate(connection_errors):
+        print(f"  {i+1}. {error}")
     
     print("Docker'a bağlanılamadı, uygulama sınırlı işlevsellikle çalışacak.")
     # Docker client değişkenini None olarak ayarla
