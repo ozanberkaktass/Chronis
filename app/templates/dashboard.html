@@ -171,11 +171,11 @@
         const ctx = document.getElementById('resourceChart').getContext('2d');
         let resourceChart;
         let chartData = {
-            labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'],
+            labels: [],  // Dinamik olarak doldurulacak
             datasets: [
                 {
                     label: 'CPU Kullanımı (%)',
-                    data: [10, 25, 45, 30, 60, 40],
+                    data: [],  // Dinamik olarak doldurulacak
                     borderColor: '#6366f1',
                     backgroundColor: 'rgba(99, 102, 241, 0.1)',
                     borderWidth: 2,
@@ -184,7 +184,7 @@
                 },
                 {
                     label: 'Bellek Kullanımı (%)',
-                    data: [30, 40, 35, 50, 65, 45],
+                    data: [],  // Dinamik olarak doldurulacak
                     borderColor: '#10b981',
                     backgroundColor: 'rgba(16, 185, 129, 0.1)',
                     borderWidth: 2,
@@ -275,18 +275,19 @@
         // Sistem durumu grafiğini güncelle
         function updateSystemChart(systemData) {
             if (resourceChart) {
-                // Mevcut verileri tut ve kaydır
-                const cpuData = resourceChart.data.datasets[0].data;
-                const memData = resourceChart.data.datasets[1].data;
+                // Şu anki zamanı grafiğe ekle
+                const currentTime = systemData.time || new Date().toLocaleTimeString();
                 
-                // Yeni verileri ekle
-                cpuData.push(systemData.cpu_usage);
-                memData.push(systemData.memory_usage);
+                // Etiketleri ve verileri güncelle
+                resourceChart.data.labels.push(currentTime);
+                resourceChart.data.datasets[0].data.push(systemData.cpu_usage);
+                resourceChart.data.datasets[1].data.push(systemData.memory_usage);
                 
-                // Veri sınırını aşarsa eski verileri sil
-                if (cpuData.length > 6) {
-                    cpuData.shift();
-                    memData.shift();
+                // Maksimum 6 veri noktası göster
+                if (resourceChart.data.labels.length > 6) {
+                    resourceChart.data.labels.shift();
+                    resourceChart.data.datasets[0].data.shift();
+                    resourceChart.data.datasets[1].data.shift();
                 }
                 
                 resourceChart.update();

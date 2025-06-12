@@ -605,6 +605,9 @@ def volume_list():
 @app.route('/api/stats')
 def api_stats():
     try:
+        # Şu anki sunucu saati
+        now = datetime.datetime.now()
+        
         stats = {
             'containers': {
                 'total': 0,
@@ -617,23 +620,24 @@ def api_stats():
             'system': {
                 'cpu_usage': random.randint(10, 60),
                 'memory_usage': random.randint(20, 70),
-                'disk_usage': random.randint(30, 80)
+                'disk_usage': random.randint(30, 80),
+                'time': now.strftime('%H:%M:%S')
             },
             'events': [
                 {
-                    'time': datetime.datetime.now().strftime('%H:%M:%S'),
+                    'time': now.strftime('%H:%M:%S'),
                     'event': 'Container başlatıldı',
                     'source': 'chronis',
                     'status': 'success'
                 },
                 {
-                    'time': (datetime.datetime.now() - datetime.timedelta(minutes=2)).strftime('%H:%M:%S'),
+                    'time': (now - datetime.timedelta(minutes=2)).strftime('%H:%M:%S'),
                     'event': 'Image indirildi',
                     'source': 'nginx:latest',
                     'status': 'success'
                 },
                 {
-                    'time': (datetime.datetime.now() - datetime.timedelta(minutes=5)).strftime('%H:%M:%S'),
+                    'time': (now - datetime.timedelta(minutes=5)).strftime('%H:%M:%S'),
                     'event': 'Container oluşturuldu',
                     'source': 'chronis',
                     'status': 'success'
