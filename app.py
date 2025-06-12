@@ -5,6 +5,7 @@ import json
 import re
 import random
 import datetime
+import time
 
 # Flask uygulamasını başlat ve şablon klasörünü doğru şekilde ayarla
 from flask import Flask, render_template, redirect, url_for, flash, request, jsonify
