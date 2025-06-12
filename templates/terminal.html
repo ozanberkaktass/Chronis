@@ -9,9 +9,61 @@
         background: #181f2a;
         color: #f0f0f0;
     }
+    .modern-terminal-wrapper {
+        max-width: 1100px;
+        margin: 40px auto 0 auto;
+        border-radius: 16px;
+        box-shadow: 0 8px 32px 0 rgba(0,0,0,0.25);
+        background: #23272e;
+        overflow: hidden;
+        border: 1.5px solid #23272e;
+    }
+    .modern-terminal-header {
+        display: flex;
+        align-items: center;
+        background: linear-gradient(90deg, #23272e 80%, #3a3f4b 100%);
+        padding: 0.75rem 1.5rem;
+        border-bottom: 1px solid #292d36;
+    }
+    .modern-terminal-header .icon {
+        font-size: 1.5rem;
+        color: #7ee787;
+        margin-right: 0.75rem;
+    }
+    .modern-terminal-header .title {
+        font-size: 1.2rem;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        color: #f0f0f0;
+    }
     #terminal-container {
         width: 100%;
-        /* Tüm görsel stiller kaldırıldı */
+        height: 480px;
+        background: #181f2a;
+        padding: 0;
+        border-radius: 0 0 16px 16px;
+        overflow: hidden;
+        position: relative;
+    }
+    #terminal-container .xterm {
+        width: 100% !important;
+        height: 100% !important;
+        min-height: 100% !important;
+        background: transparent !important;
+        font-size: 1.05rem;
+    }
+    @media (max-width: 1200px) {
+        .modern-terminal-wrapper {
+            max-width: 98vw;
+        }
+    }
+    @media (max-width: 700px) {
+        .modern-terminal-header {
+            padding: 0.5rem 0.7rem;
+        }
+        #terminal-container {
+            height: 300px;
+        }
     }
     .container-fluid {
         max-width: 1400px;
@@ -60,12 +112,6 @@
             padding: 0 10px;
         }
     }
-    #terminal-container .xterm {
-        width: 100% !important;
-        height: auto !important;
-        min-height: 0 !important;
-        background: transparent !important;
-    }
 </style>
 {% endblock %}
 
@@ -99,7 +145,13 @@
     
     <div class="row">
         <div class="col-12">
-            <div id="terminal-container"></div>
+            <div class="modern-terminal-wrapper">
+                <div class="modern-terminal-header">
+                    <span class="icon"><i class="fas fa-terminal"></i></span>
+                    <span class="title">Terminal</span>
+                </div>
+                <div id="terminal-container"></div>
+            </div>
         </div>
     </div>
 </div>
