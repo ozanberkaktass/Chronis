@@ -31,14 +31,10 @@ RUN curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add - && \
 
 COPY . .
 
-# Docker socket için hacim oluştur
-VOLUME /var/run/docker.sock
-
-# Docker socket'ini doğru izinlerle erişilebilir yapma
-RUN ln -sf /var/run/docker.sock /tmp/docker.sock && \
-    chmod 666 /tmp/docker.sock || true
+# Docker socket hacim noktasını hazırla - socket dosyasını önceden oluşturmuyoruz
+RUN mkdir -p /docker-socket
 
 EXPOSE 5000
 
-# Docker socket'i hazırla ve uygulamayı başlat
-CMD ["sh", "-c", "chmod 666 /var/run/docker.sock || true && python app.py"] 
+# Uygulamayı başlat
+CMD ["python", "app.py"] 

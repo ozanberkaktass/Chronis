@@ -3,6 +3,8 @@ import docker
 import os
 import json
 from datetime import datetime
+import time
+import subprocess
 
 # Flask uygulamasını başlat ve şablon klasörünü doğru şekilde ayarla
 template_dir = os.path.abspath('app/templates')
@@ -13,28 +15,64 @@ app.secret_key = "chronis_gizli_anahtar"  # Gerçek uygulamada değiştirin
 # Global değişken olarak Docker istemcisini tanımla
 client = None
 
-# Docker istemcisini başlat
-try:
-    # Docker socket yolu
-    socket_path = '/var/run/docker.sock'
+# Docker bağlantısını birkaç kez deneme
+def connect_to_docker(max_attempts=5, delay=2):
+    global client
     
-    # Docker istemcisini oluştur
-    # Eğer DOCKER_HOST çevre değişkeni tanımlıysa, onu kullan
-    if os.environ.get('DOCKER_HOST'):
-        client = docker.from_env()
-        print(f"DOCKER_HOST çevre değişkeniyle bağlanma deneniyor: {os.environ.get('DOCKER_HOST')}")
-    else:
-        # Doğrudan socket yolunu belirt
-        client = docker.DockerClient(base_url=f"unix://{socket_path}")
-        print(f"Unix socket ile bağlanma deneniyor: {socket_path}")
+    for attempt in range(max_attempts):
+        try:
+            # Docker socket yolları
+            possible_paths = [
+                '/var/run/docker.sock',
+                '/run/docker.sock',
+                '/tmp/docker.sock'
+            ]
+            
+            # Docker host ortam değişkeni
+            docker_host = os.environ.get('DOCKER_HOST')
+            
+            if docker_host:
+                print(f"DOCKER_HOST ile bağlanma deneniyor: {docker_host}")
+                client = docker.from_env()
+                # Bağlantıyı test et
+                version = client.version()
+                print(f"Bağlantı başarılı. Docker versiyonu: {version.get('Version', 'bilinmiyor')}")
+                return True
+            
+            # Birden fazla socket yolunu dene
+            for socket_path in possible_paths:
+                if os.path.exists(socket_path):
+                    print(f"Socket yolu bulundu: {socket_path}")
+                    try:
+                        client = docker.DockerClient(base_url=f"unix://{socket_path}")
+                        # Bağlantıyı test et
+                        version = client.version()
+                        print(f"Bağlantı başarılı. Docker versiyonu: {version.get('Version', 'bilinmiyor')}")
+                        return True
+                    except Exception as e:
+                        print(f"Socket yolu {socket_path} üzerinden bağlantı başarısız: {e}")
+                        continue
+            
+            # Komut satırından Docker sürümünü al
+            try:
+                version_output = subprocess.check_output(['docker', 'version', '--format', '{{json .}}'])
+                print(f"Docker CLI bağlantısı başarılı: {version_output}")
+                # CLI kullanılabilir durumda, API olmasa da bazı işlemleri CLI ile yapabiliriz
+            except:
+                print("Docker CLI erişimi başarısız")
+            
+            print(f"Deneme {attempt+1}/{max_attempts} başarısız, {delay} saniye bekleyip tekrar deneniyor...")
+            time.sleep(delay)
+        
+        except Exception as e:
+            print(f"Deneme {attempt+1}/{max_attempts} sırasında hata: {e}")
+            time.sleep(delay)
     
-    # Bağlantıyı test et
-    version = client.version()
-    print(f"Docker bağlantısı başarılı. Docker versiyonu: {version.get('Version', 'bilinmiyor')}")
-    
-except Exception as e:
-    print(f"Docker bağlantısı kurulamadı: {e}")
-    client = None
+    print("Docker bağlantısı kurulamadı. Sınırlı işlevsellikle devam ediliyor.")
+    return False
+
+# Uygulama başlangıcında Docker'a bağlan
+connect_to_docker()
 
 @app.route('/')
 def index():
@@ -199,6 +237,28 @@ def api_stats():
         return jsonify(stats)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/status')
+def api_status():
+    """Docker bağlantı durumunu kontrol et"""
+    try:
+        global client
+        
+        # Eğer client None ise yeniden bağlanmayı dene
+        if client is None:
+            connect_to_docker(max_attempts=1)
+        
+        if client:
+            version = client.version()
+            return jsonify({
+                'status': 'connected',
+                'version': version.get('Version', 'bilinmiyor'),
+                'api_version': version.get('ApiVersion', 'bilinmiyor')
+            })
+        else:
+            return jsonify({'status': 'disconnected', 'error': 'Docker client bağlantısı kurulamadı'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000) 
