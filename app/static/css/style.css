@@ -45,6 +45,52 @@
     --info-color: #2563eb;
 }
 
+/* Açık tema için tablo başlıkları ve diğer metin renkleri */
+[data-theme="light"] .table th {
+    color: #334155;
+}
+
+[data-theme="light"] .card-header {
+    background-color: #f8fafc;
+}
+
+[data-theme="light"] .dropdown-menu {
+    background-color: #ffffff;
+}
+
+[data-theme="light"] .stat-tag.green {
+    background-color: rgba(16, 185, 129, 0.2);
+    color: #059669;
+}
+
+[data-theme="light"] .stat-tag.red {
+    background-color: rgba(239, 68, 68, 0.2);
+    color: #dc2626;
+}
+
+[data-theme="light"] .status-badge {
+    color: #ffffff;
+}
+
+[data-theme="light"] .status-badge.running {
+    background-color: #059669;
+    color: #ffffff;
+}
+
+[data-theme="light"] .status-badge.exited {
+    background-color: #dc2626;
+    color: #ffffff;
+}
+
+[data-theme="light"] .sidebar .nav-link.active {
+    color: #4f46e5;
+    background-color: rgba(79, 70, 229, 0.1);
+}
+
+[data-theme="light"] .logo-container h3 {
+    color: #4f46e5;
+}
+
 * {
     box-sizing: border-box;
 }

@@ -1,129 +1,95 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="container-header d-flex justify-content-between align-items-center mb-4">
     <div>
-        <h1 class="h3">Container Listesi</h1>
-        <p class="text-muted">Tüm Docker container'larınızı yönetin</p>
+        <h1 class="h3 mb-1" data-i18n="containers">Containers</h1>
+        <p class="text-muted" data-i18n="containers_desc">Docker containerlarınızı yönetin</p>
     </div>
-    <div>
-        <div class="input-group">
-            <input type="text" id="containerSearch" class="form-control" placeholder="Ara...">
-            <button class="btn btn-primary" type="button" id="refreshBtn">
-                <i class="fas fa-sync-alt"></i> Yenile
-            </button>
-            <button class="btn btn-success" type="button" data-bs-toggle="modal" data-bs-target="#createContainerModal">
-                <i class="fas fa-plus"></i> Container Ekle
-            </button>
-        </div>
-    </div>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createContainerModal">
+        <i class="fas fa-plus"></i> <span data-i18n="create_new">Yeni Oluştur</span>
+    </button>
 </div>
 
-<div class="card bg-dark text-white">
+<div class="card">
+    <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center">
+                <div class="input-group me-3">
+                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                    <input type="text" class="form-control" id="containerSearch" placeholder="{{ 'Ara...' }}">
+                </div>
+                <select class="form-select" id="statusFilter">
+                    <option value="all" data-i18n="all">Tümü</option>
+                    <option value="running" data-i18n="running">Çalışıyor</option>
+                    <option value="exited" data-i18n="stopped">Durmuş</option>
+                </select>
+            </div>
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="autoRefreshToggle">
+                <label class="form-check-label" for="autoRefreshToggle" data-i18n="auto_refresh">Otomatik Yenile</label>
+            </div>
+        </div>
+    </div>
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-dark table-hover">
+            <table class="table table-hover">
                 <thead>
                     <tr>
-                        <th scope="col">
-                            <input type="checkbox" class="form-check-input" id="selectAll">
-                        </th>
-                        <th scope="col">İsim</th>
-                        <th scope="col">Durum</th>
-                        <th scope="col">Hızlı İşlemler</th>
-                        <th scope="col">Image</th>
-                        <th scope="col">Oluşturuldu</th>
-                        <th scope="col">IP Adresi</th>
-                        <th scope="col">Port</th>
-                        <th scope="col">İşlemler</th>
+                        <th data-i18n="name">İsim</th>
+                        <th data-i18n="image">Image</th>
+                        <th data-status-col data-i18n="status">Durum</th>
+                        <th data-i18n="ports">Portlar</th>
+                        <th data-i18n="created">Oluşturulma</th>
+                        <th data-i18n="actions" class="text-end">İşlemler</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for container in containers %}
                     <tr>
                         <td>
-                            <input type="checkbox" class="form-check-input container-check" value="{{ container.id }}">
-                        </td>
-                        <td>
-                            <a href="{{ url_for('container_detail', id=container.id) }}" class="text-white text-decoration-none">
+                            <a href="{{ url_for('container_detail', id=container.id) }}" class="text-decoration-none">
                                 {{ container.name }}
                             </a>
                         </td>
+                        <td>{{ container.image.tags[0] if container.image.tags else container.image }}</td>
                         <td>
-                            {% if container.status == 'running' %}
-                            <span class="badge bg-success">Çalışıyor</span>
-                            {% elif container.status == 'exited' %}
-                            <span class="badge bg-danger">Durmuş</span>
-                            {% else %}
-                            <span class="badge bg-secondary">{{ container.status }}</span>
-                            {% endif %}
+                            <span class="status-badge {{ container.status }}">
+                                {{ container.status }}
+                            </span>
                         </td>
-                        <td>
-                            <div class="btn-group" role="group">
+                        <td>{{ container.ports }}</td>
+                        <td>{{ container.attrs.Created | datetime }}</td>
+                        <td class="text-end">
+                            <div class="container-controls">
                                 {% if container.status == 'running' %}
                                 <form action="{{ url_for('stop_container', id=container.id) }}" method="POST" class="d-inline">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Durdur">
+                                    <button type="submit" class="btn btn-warning btn-sm" data-bs-toggle="tooltip" title="Durdur">
                                         <i class="fas fa-stop"></i>
                                     </button>
                                 </form>
                                 <form action="{{ url_for('restart_container', id=container.id) }}" method="POST" class="d-inline">
-                                    <button type="submit" class="btn btn-sm btn-outline-warning" title="Yeniden Başlat">
+                                    <button type="submit" class="btn btn-info btn-sm" data-bs-toggle="tooltip" title="Yeniden Başlat">
                                         <i class="fas fa-sync-alt"></i>
                                     </button>
                                 </form>
                                 {% elif container.status == 'exited' %}
                                 <form action="{{ url_for('start_container', id=container.id) }}" method="POST" class="d-inline">
-                                    <button type="submit" class="btn btn-sm btn-outline-success" title="Başlat">
+                                    <button type="submit" class="btn btn-success btn-sm" data-bs-toggle="tooltip" title="Başlat">
                                         <i class="fas fa-play"></i>
                                     </button>
                                 </form>
                                 {% endif %}
-                                <a href="{{ url_for('container_logs', id=container.id) }}" class="btn btn-sm btn-outline-info" title="Loglar">
+                                <form action="{{ url_for('remove_container', id=container.id) }}" method="POST" class="d-inline">
+                                    <button type="submit" class="btn btn-danger btn-sm" data-bs-toggle="tooltip" title="Sil" onclick="return confirm('Bu container\'ı silmek istediğinizden emin misiniz?');">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                                <a href="{{ url_for('container_logs', id=container.id) }}" class="btn btn-dark btn-sm" data-bs-toggle="tooltip" title="Loglar">
                                     <i class="fas fa-file-alt"></i>
                                 </a>
                             </div>
                         </td>
-                        <td>{{ container.image.tags[0] if container.image.tags else container.image.id[:12] }}</td>
-                        <td>{{ container.attrs.Created.split('T')[0] }}</td>
-                        <td>
-                            {% if container.attrs.NetworkSettings.Networks %}
-                                {% for network_name, network in container.attrs.NetworkSettings.Networks.items() %}
-                                    {{ network.IPAddress }}
-                                {% endfor %}
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if container.ports %}
-                                {% for port in container.ports %}
-                                    {{ port }}
-                                {% endfor %}
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
-                        <td>
-                            <div class="dropdown">
-                                <button class="btn btn-sm btn-secondary dropdown-toggle" type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false">
-                                    <i class="fas fa-ellipsis-v"></i>
-                                </button>
-                                <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="dropdownMenuButton1">
-                                    <li><a class="dropdown-item" href="{{ url_for('container_detail', id=container.id) }}">Detaylar</a></li>
-                                    <li><a class="dropdown-item" href="{{ url_for('container_logs', id=container.id) }}">Loglar</a></li>
-                                    <li><hr class="dropdown-divider"></li>
-                                    <li>
-                                        <form action="{{ url_for('remove_container', id=container.id) }}" method="POST" class="d-inline">
-                                            <button type="submit" class="dropdown-item text-danger">Sil</button>
-                                        </form>
-                                    </li>
-                                </ul>
-                            </div>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="9" class="text-center">Hiç container bulunamadı.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -132,47 +98,45 @@
     </div>
 </div>
 
-<!-- Container Oluşturma Modal -->
+<!-- Container Oluştur Modal -->
 <div class="modal fade" id="createContainerModal" tabindex="-1" aria-labelledby="createContainerModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
-        <div class="modal-content bg-dark text-white">
+        <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="createContainerModalLabel">Yeni Container Oluştur</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Kapat"></button>
+                <h5 class="modal-title" id="createContainerModalLabel" data-i18n="create_container">Container Oluştur</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form id="createContainerForm">
-                    <div class="mb-3">
-                        <label for="imageName" class="form-label">Image</label>
-                        <input type="text" class="form-control" id="imageName" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="containerName" class="form-label">Container İsmi</label>
-                        <input type="text" class="form-control" id="containerName">
-                    </div>
-                    <div class="mb-3">
-                        <label for="ports" class="form-label">Portlar (host:container)</label>
-                        <input type="text" class="form-control" id="ports" placeholder="8080:80, 3306:3306">
-                    </div>
-                    <div class="mb-3">
-                        <label for="volumes" class="form-label">Volumes (host:container)</label>
-                        <input type="text" class="form-control" id="volumes" placeholder="/data:/app/data">
-                    </div>
-                    <div class="mb-3">
-                        <label for="env" class="form-label">Çevre Değişkenleri</label>
-                        <textarea class="form-control" id="env" rows="3" placeholder="KEY=value&#10;ANOTHER_KEY=value"></textarea>
-                    </div>
-                    <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" id="startAfterCreation" checked>
-                        <label class="form-check-label" for="startAfterCreation">
-                            Oluşturulduktan sonra başlat
-                        </label>
-                    </div>
-                </form>
+                <div class="mb-3">
+                    <label for="imageName" class="form-label" data-i18n="image_name">Image İsmi</label>
+                    <input type="text" class="form-control" id="imageName" placeholder="örn: nginx:latest">
+                </div>
+                <div class="mb-3">
+                    <label for="containerName" class="form-label" data-i18n="container_name">Container İsmi (opsiyonel)</label>
+                    <input type="text" class="form-control" id="containerName" placeholder="örn: web-server">
+                </div>
+                <div class="mb-3">
+                    <label for="ports" class="form-label" data-i18n="port_mapping">Port Eşleme (opsiyonel)</label>
+                    <input type="text" class="form-control" id="ports" placeholder="örn: 8080:80">
+                </div>
+                <div class="mb-3">
+                    <label for="volumes" class="form-label" data-i18n="volume_mapping">Volume Eşleme (opsiyonel)</label>
+                    <input type="text" class="form-control" id="volumes" placeholder="örn: /host/path:/container/path">
+                </div>
+                <div class="mb-3">
+                    <label for="env" class="form-label" data-i18n="env_vars">Çevre Değişkenleri (opsiyonel)</label>
+                    <input type="text" class="form-control" id="env" placeholder="örn: KEY1=value1,KEY2=value2">
+                </div>
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="startAfterCreation" checked>
+                    <label class="form-check-label" for="startAfterCreation" data-i18n="start_after_creation">
+                        Oluşturulduktan sonra başlat
+                    </label>
+                </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
-                <button type="button" class="btn btn-primary" id="createContainerBtn">Oluştur</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="cancel">İptal</button>
+                <button type="button" class="btn btn-primary" id="createContainerBtn" data-i18n="create">Oluştur</button>
             </div>
         </div>
     </div>

@@ -10,6 +10,51 @@ document.addEventListener('DOMContentLoaded', function() {
         return new bootstrap.Tooltip(tooltipTriggerEl);
     });
 
+    // Çeviri olayını dinle
+    document.addEventListener('translationsLoaded', function(e) {
+        const translations = e.detail.translations;
+        
+        // Sayfalara özgü dinamik çevirileri uygula
+        applyDynamicTranslations(translations);
+    });
+    
+    // Dinamik içeriklere çevirileri uygulama fonksiyonu
+    function applyDynamicTranslations(translations) {
+        // Container tablosu başlıkları
+        const containerStatusCol = document.querySelector('th[data-status-col]');
+        if (containerStatusCol && translations.status) {
+            containerStatusCol.textContent = translations.status;
+        }
+        
+        // Çalışıyor/Durmuş gibi durum bilgileri
+        const statusRunning = document.querySelectorAll('.status-badge.running');
+        statusRunning.forEach(badge => {
+            if (translations.running) {
+                badge.textContent = translations.running;
+            }
+        });
+        
+        const statusStopped = document.querySelectorAll('.status-badge.exited');
+        statusStopped.forEach(badge => {
+            if (translations.stopped) {
+                badge.textContent = translations.stopped;
+            }
+        });
+        
+        // Grafik etiketleri güncelleme
+        const charts = window.charts || [];
+        charts.forEach(chart => {
+            if (chart.data && chart.data.datasets) {
+                chart.data.datasets.forEach(dataset => {
+                    if (dataset.originalLabel && translations[dataset.originalLabel]) {
+                        dataset.label = translations[dataset.originalLabel];
+                    }
+                });
+                chart.update();
+            }
+        });
+    }
+
     // Container oluşturma işlemi
     const createContainerBtn = document.getElementById('createContainerBtn');
     if (createContainerBtn) {

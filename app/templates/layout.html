@@ -21,27 +21,27 @@
         <ul class="nav flex-column">
             <li class="nav-item">
                 <a class="nav-link {{ 'active' if request.endpoint == 'dashboard' else '' }}" href="{{ url_for('dashboard') }}">
-                    <i class="fas fa-chart-pie"></i> <span>Dashboard</span>
+                    <i class="fas fa-chart-pie"></i> <span data-i18n="dashboard">Dashboard</span>
                 </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link {{ 'active' if request.endpoint == 'container_list' or request.endpoint == 'container_detail' or request.endpoint == 'container_logs' else '' }}" href="{{ url_for('container_list') }}">
-                    <i class="fas fa-cubes"></i> <span>Containers</span>
+                    <i class="fas fa-cubes"></i> <span data-i18n="containers">Containers</span>
                 </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link {{ 'active' if request.endpoint == 'image_list' else '' }}" href="{{ url_for('image_list') }}">
-                    <i class="fas fa-layer-group"></i> <span>Images</span>
+                    <i class="fas fa-layer-group"></i> <span data-i18n="images">Images</span>
                 </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link {{ 'active' if request.endpoint == 'network_list' else '' }}" href="{{ url_for('network_list') }}">
-                    <i class="fas fa-project-diagram"></i> <span>Networks</span>
+                    <i class="fas fa-project-diagram"></i> <span data-i18n="networks">Networks</span>
                 </a>
             </li>
             <li class="nav-item">
                 <a class="nav-link {{ 'active' if request.endpoint == 'volume_list' else '' }}" href="{{ url_for('volume_list') }}">
-                    <i class="fas fa-database"></i> <span>Volumes</span>
+                    <i class="fas fa-database"></i> <span data-i18n="volumes">Volumes</span>
                 </a>
             </li>
         </ul>
@@ -209,14 +209,37 @@
                         
                         // Menü öğelerini çevir
                         if (translations.menu) {
-                            document.querySelector('.menu-settings').textContent = translations.menu.settings || 'Ayarlar';
-                            document.querySelector('.menu-history').textContent = translations.menu.history || 'İşlem Geçmişi';
-                            document.querySelector('.menu-logout').textContent = translations.menu.logout || 'Çıkış';
+                            if (document.querySelector('.menu-settings')) {
+                                document.querySelector('.menu-settings').textContent = translations.menu.settings || 'Ayarlar';
+                            }
+                            if (document.querySelector('.menu-history')) {
+                                document.querySelector('.menu-history').textContent = translations.menu.history || 'İşlem Geçmişi';
+                            }
+                            if (document.querySelector('.menu-logout')) {
+                                document.querySelector('.menu-logout').textContent = translations.menu.logout || 'Çıkış';
+                            }
                         }
+                        
+                        // Sayfa başlığını çevir
+                        if (translations.app_title) {
+                            document.title = translations.app_title;
+                        }
+                        
+                        // Özel çeviri olayını tetikle (diğer sayfalardaki JavaScript'lerin yanıt vermesi için)
+                        const event = new CustomEvent('translationsLoaded', { detail: { translations: translations } });
+                        document.dispatchEvent(event);
                     })
                     .catch(error => {
                         console.error('Çeviri yükleme hatası:', error);
                     });
+            }
+            
+            // Sayfa yüklendiğinde çevirileri yükle
+            if (savedLanguage) {
+                loadTranslations(savedLanguage);
+            } else {
+                // Varsayılan dil Türkçe
+                loadTranslations('tr');
             }
         });
     </script>
