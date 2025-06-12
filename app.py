@@ -28,22 +28,13 @@ def connect_to_docker(max_attempts=5, delay=2):
                 '/tmp/docker.sock'
             ]
             
-            # Docker host ortam değişkeni
-            docker_host = os.environ.get('DOCKER_HOST')
-            
-            if docker_host:
-                print(f"DOCKER_HOST ile bağlanma deneniyor: {docker_host}")
-                client = docker.from_env()
-                # Bağlantıyı test et
-                version = client.version()
-                print(f"Bağlantı başarılı. Docker versiyonu: {version.get('Version', 'bilinmiyor')}")
-                return True
-            
-            # Birden fazla socket yolunu dene
+            # Docker host ortam değişkeni - burada direkt unix:// protokolü ile socket'i tanımlıyoruz
+            # DOCKER_HOST değişkeni kullanmak yerine doğrudan socket'e bağlanma yaklaşımı
             for socket_path in possible_paths:
                 if os.path.exists(socket_path):
                     print(f"Socket yolu bulundu: {socket_path}")
                     try:
+                        # Direkt socket yolunu kullanarak bağlan
                         client = docker.DockerClient(base_url=f"unix://{socket_path}")
                         # Bağlantıyı test et
                         version = client.version()
@@ -52,6 +43,16 @@ def connect_to_docker(max_attempts=5, delay=2):
                     except Exception as e:
                         print(f"Socket yolu {socket_path} üzerinden bağlantı başarısız: {e}")
                         continue
+            
+            # Alternatif olarak from_env kullanarak dene
+            try:
+                print("docker.from_env() ile bağlanmayı deniyorum...")
+                client = docker.from_env()
+                version = client.version()
+                print(f"from_env ile bağlantı başarılı. Docker versiyonu: {version.get('Version', 'bilinmiyor')}")
+                return True
+            except Exception as e:
+                print(f"from_env ile bağlantı başarısız: {e}")
             
             # Komut satırından Docker sürümünü al
             try:
