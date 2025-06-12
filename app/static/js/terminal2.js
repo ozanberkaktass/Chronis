@@ -13,6 +13,10 @@ class TerminalManager {
         this.activeSession = null;
         this.socket = null;
         this.connectionUrl = null;
+        this.statusIndicator = null;
+        this.statusText = null;
+        this.fontSize = 14;
+        this.theme = 'dark';
         this.debugMode = true; // Hata ayıklama modunu etkinleştir
     }
     
@@ -20,6 +24,8 @@ class TerminalManager {
     init() {
         // DOM elemanlarını al
         this.connectionUrl = document.getElementById('connection-url');
+        this.statusIndicator = document.getElementById('status-indicator');
+        this.statusText = document.getElementById('status-text');
         const terminalContainer = document.getElementById('terminal-container');
         
         // Terminal'i oluştur
@@ -48,11 +54,12 @@ class TerminalManager {
                 brightCyan: '#34e2e2',
                 brightWhite: '#eeeeec'
             },
-            fontSize: 14,
+            fontSize: this.fontSize,
             fontFamily: 'Consolas, "Courier New", monospace',
             lineHeight: 1.2,
             convertEol: true,
-            scrollback: 5000
+            scrollback: 5000,
+            disableStdin: false
         });
         
         // Terminal eklentileri
@@ -100,6 +107,8 @@ class TerminalManager {
         this.term.writeln('Bir terminal oturumu başlatmak için sağ üstteki \x1B[1;32m+\x1B[0m butonuna tıklayın.');
         this.term.writeln('');
         this.term.writeln('\x1B[2mBağlantı bekleniyor...\x1B[0m');
+        this.term.writeln('');
+        this.term.write('\x1B[32mroot@localhost\x1B[0m:\x1B[34m~\x1B[0m$ ');
     }
     
     // Terminal boyutunu ayarla
@@ -172,11 +181,90 @@ class TerminalManager {
             }
         });
         
+        // Font boyutu kontrolleri
+        document.getElementById('btn-font-size-decrease').addEventListener('click', () => {
+            this.changeFontSize(-1);
+        });
+        
+        document.getElementById('btn-font-size-increase').addEventListener('click', () => {
+            this.changeFontSize(1);
+        });
+        
+        // Tema değiştirme
+        document.getElementById('btn-theme').addEventListener('click', () => {
+            this.toggleTheme();
+        });
+        
         // Ayarlar butonu
         document.getElementById('btn-settings').addEventListener('click', () => {
             this.log('Settings button clicked');
             // Burada ayarlar menüsü gösterilebilir
         });
+    }
+    
+    // Font boyutunu değiştir
+    changeFontSize(delta) {
+        this.fontSize = Math.max(10, Math.min(20, this.fontSize + delta));
+        this.term.options.fontSize = this.fontSize;
+        this.fitAddon.fit();
+        this.log('Font boyutu değiştirildi:', this.fontSize);
+    }
+    
+    // Temayı değiştir
+    toggleTheme() {
+        if (this.theme === 'dark') {
+            this.theme = 'light';
+            this.term.options.theme = {
+                background: '#ffffff',
+                foreground: '#000000',
+                cursor: '#000000',
+                cursorAccent: '#ffffff',
+                selection: 'rgba(0, 0, 0, 0.3)',
+                black: '#000000',
+                red: '#cc0000',
+                green: '#4e9a06',
+                yellow: '#c4a000',
+                blue: '#3465a4',
+                magenta: '#75507b',
+                cyan: '#06989a',
+                white: '#d3d7cf',
+                brightBlack: '#555753',
+                brightRed: '#ef2929',
+                brightGreen: '#8ae234',
+                brightYellow: '#fce94f',
+                brightBlue: '#729fcf',
+                brightMagenta: '#ad7fa8',
+                brightCyan: '#34e2e2',
+                brightWhite: '#eeeeec'
+            };
+        } else {
+            this.theme = 'dark';
+            this.term.options.theme = {
+                background: '#000000',
+                foreground: '#f0f0f0',
+                cursor: '#ffffff',
+                cursorAccent: '#000000',
+                selection: 'rgba(255, 255, 255, 0.3)',
+                black: '#000000',
+                red: '#cc0000',
+                green: '#4e9a06',
+                yellow: '#c4a000',
+                blue: '#3465a4',
+                magenta: '#75507b',
+                cyan: '#06989a',
+                white: '#d3d7cf',
+                brightBlack: '#555753',
+                brightRed: '#ef2929',
+                brightGreen: '#8ae234',
+                brightYellow: '#fce94f',
+                brightBlue: '#729fcf',
+                brightMagenta: '#ad7fa8',
+                brightCyan: '#34e2e2',
+                brightWhite: '#eeeeec'
+            };
+        }
+        this.term.refresh();
+        this.log('Tema değiştirildi:', this.theme);
     }
     
     // Tam ekran modunu aç/kapat
@@ -196,6 +284,7 @@ class TerminalManager {
     handleConnect() {
         this.log('Socket.io bağlantısı kuruldu');
         this.term.writeln('\r\n\x1B[1;32mSocket.io bağlantısı kuruldu.\x1B[0m');
+        this.updateStatus('connected', 'Socket.io bağlantısı kuruldu');
     }
     
     handleDisconnect() {
@@ -203,11 +292,13 @@ class TerminalManager {
         this.term.writeln('\r\n\x1B[1;31mSocket.io bağlantısı kesildi. Sayfa yenilenmeli!\x1B[0m');
         this.activeSession = null;
         this.updateConnectionUrl('');
+        this.updateStatus('disconnected', 'Bağlantı kesildi');
     }
     
     handleConnectError(error) {
         this.logError('Socket.io bağlantı hatası:', error);
         this.term.writeln(`\r\n\x1B[1;31mBağlantı hatası: ${error.message}\x1B[0m`);
+        this.updateStatus('disconnected', `Bağlantı hatası: ${error.message}`);
     }
     
     handleTerminalOutput(data) {
@@ -220,6 +311,7 @@ class TerminalManager {
     handleConnectionError(data) {
         this.logError('Terminal bağlantı hatası:', data);
         this.term.writeln(`\r\n\x1B[1;31mHata: ${data.error}\x1B[0m`);
+        this.updateStatus('disconnected', `Hata: ${data.error}`);
     }
     
     handleSessionCreated(data) {
@@ -232,6 +324,7 @@ class TerminalManager {
         
         this.term.clear();
         this.term.writeln('\x1B[1;32mTerminal oturumu başlatıldı. Bağlantı kuruluyor...\x1B[0m');
+        this.updateStatus('connected', 'Bağlantı kuruldu');
         
         // Oturum oluşturulduktan sonra terminal boyutunu ayarla
         setTimeout(() => {
@@ -242,6 +335,17 @@ class TerminalManager {
                 data: "\r\n"
             });
         }, 500);
+    }
+    
+    // Durum göstergesini güncelle
+    updateStatus(status, message) {
+        if (this.statusIndicator) {
+            this.statusIndicator.className = 'status-indicator ' + status;
+        }
+        
+        if (this.statusText) {
+            this.statusText.textContent = message || '';
+        }
     }
     
     // Bağlantı URL'sini güncelle
@@ -261,7 +365,62 @@ class TerminalManager {
                 session_id: this.activeSession,
                 data: data
             });
+        } else {
+            // Demo modu - gerçek bağlantı olmadığında basit komutları taklit et
+            if (data === '\r') {
+                const input = this.term._core.buffer.active.getLine(this.term._core.buffer.active.baseY + this.term._core.buffer.active.cursorY).translateToString().trim().replace(/^.*\$ /, '');
+                this.handleDemoCommand(input);
+            } else {
+                this.term.write(data);
+            }
         }
+    }
+    
+    // Demo modu - basit komutları taklit et
+    handleDemoCommand(command) {
+        this.term.writeln('');
+        
+        switch (command.toLowerCase()) {
+            case 'help':
+                this.term.writeln('Kullanılabilir komutlar:');
+                this.term.writeln('  help     - Bu yardım mesajını göster');
+                this.term.writeln('  clear    - Ekranı temizle');
+                this.term.writeln('  ls       - Dosyaları listele');
+                this.term.writeln('  date     - Tarih ve saati göster');
+                this.term.writeln('  connect  - Bağlantı menüsünü aç');
+                break;
+                
+            case 'clear':
+                this.term.clear();
+                break;
+                
+            case 'ls':
+                this.term.writeln('index.html');
+                this.term.writeln('style.css');
+                this.term.writeln('app.js');
+                this.term.writeln('README.md');
+                this.term.writeln('package.json');
+                break;
+                
+            case 'date':
+                this.term.writeln(new Date().toString());
+                break;
+                
+            case 'connect':
+                const modal = new bootstrap.Modal(document.getElementById('newSessionModal'));
+                modal.show();
+                break;
+                
+            case '':
+                // Boş komut, hiçbir şey yapma
+                break;
+                
+            default:
+                this.term.writeln(`Komut bulunamadı: ${command}`);
+                this.term.writeln('Kullanılabilir komutları görmek için "help" yazın');
+        }
+        
+        this.term.write('\r\n\x1B[32mroot@localhost\x1B[0m:\x1B[34m~\x1B[0m$ ');
     }
     
     // Oturum bağlantı işlemi
@@ -316,6 +475,7 @@ class TerminalManager {
         // Bağlantı kurulurken mesaj göster
         this.term.clear();
         this.term.writeln("\x1B[1;33mBağlantı kuruluyor, lütfen bekleyin...\x1B[0m");
+        this.updateStatus('disconnected', 'Bağlantı kuruluyor...');
     }
     
     // Konteynerleri getir
