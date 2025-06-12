@@ -71,6 +71,10 @@ class DockerCLIClient:
         try:
             output = subprocess.check_output(['docker', 'version', '--format', '{{json .}}'])
             self.available = True
+            self._containers = DockerCLIContainers()
+            self._images = DockerCLIImages()
+            self._networks = DockerCLINetworks()
+            self._volumes = DockerCLIVolumes()
             logger.info("Docker CLI erişimi başarılı")
         except Exception as e:
             self.available = False
@@ -84,21 +88,25 @@ class DockerCLIClient:
         except:
             return False
     
+    @property
     def containers(self):
         """SDK uyumluluğu için containers nesnesi"""
-        return DockerCLIContainers()
+        return self._containers
     
+    @property
     def images(self):
         """SDK uyumluluğu için images nesnesi"""
-        return DockerCLIImages()
+        return self._images
     
+    @property
     def networks(self):
         """SDK uyumluluğu için networks nesnesi"""
-        return DockerCLINetworks()
+        return self._networks
     
+    @property
     def volumes(self):
         """SDK uyumluluğu için volumes nesnesi"""
-        return DockerCLIVolumes()
+        return self._volumes
 
 class DockerCLIContainers:
     def list(self, all=False):
