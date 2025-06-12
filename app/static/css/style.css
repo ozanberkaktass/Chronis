@@ -78,7 +78,12 @@
 }
 
 [data-theme="light"] .table-dark.table-hover tbody tr:hover {
-    background-color: #f8fafc !important;
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
+}
+
+[data-theme="light"] .table-dark.table-hover tbody tr:hover td {
+    background-color: #f1f5f9 !important;
     color: #0f172a !important;
 }
 
@@ -106,6 +111,11 @@
 [data-theme="light"] .card.bg-dark .table-dark tbody tr td {
     background-color: #ffffff !important;
     color: #334155 !important;
+}
+
+[data-theme="light"] .card.bg-dark .table-dark.table-hover tbody tr:hover td {
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
 }
 
 [data-theme="light"] .modal-content.bg-dark {
@@ -371,7 +381,13 @@ body {
 }
 
 .table-hover tbody tr:hover {
-    background-color: rgba(255, 255, 255, 0.03);
+    background-color: var(--secondary-bg);
+    color: var(--text-color);
+}
+
+.table-hover tbody tr:hover td {
+    background-color: inherit;
+    color: inherit;
 }
 
 /* Butonlar */
@@ -805,4 +821,28 @@ input:checked + .slider:before {
     border-radius: 4px;
     padding: 4px 8px;
     font-size: 0.85rem;
+}
+
+/* Açık tema için özel hover stilleri */
+[data-theme="light"] .table-hover tbody tr:hover {
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
+}
+
+[data-theme="light"] .table-hover tbody tr:hover td {
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
+}
+
+/* Koyu tema için özel hover stilleri */
+[data-theme="dark"] .table-hover tbody tr:hover,
+.table-hover tbody tr:hover {
+    background-color: #334155 !important;
+    color: #f8fafc !important;
+}
+
+[data-theme="dark"] .table-hover tbody tr:hover td,
+.table-dark.table-hover tbody tr:hover td {
+    background-color: #334155 !important;
+    color: #f8fafc !important;
 } 
