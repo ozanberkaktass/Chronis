@@ -121,13 +121,13 @@
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="card-title mb-0">Son Etkinlikler</h5>
-                <a href="#" class="btn btn-sm btn-dark">
+                <a href="#" class="btn btn-sm btn-dark" id="refreshEvents">
                     <i class="fas fa-history me-1"></i> Tümünü Gör
                 </a>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table">
+                    <table class="table" id="eventsTable">
                         <thead>
                             <tr>
                                 <th>Zaman</th>
@@ -169,70 +169,77 @@
     document.addEventListener('DOMContentLoaded', function() {
         // Sistem kaynak grafiği
         const ctx = document.getElementById('resourceChart').getContext('2d');
-        const resourceChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'],
-                datasets: [
-                    {
-                        label: 'CPU Kullanımı (%)',
-                        data: [10, 25, 45, 30, 60, 40],
-                        borderColor: '#6366f1',
-                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                        borderWidth: 2,
-                        fill: true,
-                        tension: 0.4
-                    },
-                    {
-                        label: 'Bellek Kullanımı (%)',
-                        data: [30, 40, 35, 50, 65, 45],
-                        borderColor: '#10b981',
-                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                        borderWidth: 2,
-                        fill: true,
-                        tension: 0.4
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'top',
-                        labels: {
-                            color: '#f8fafc',
-                            usePointStyle: true,
-                            pointStyle: 'circle'
-                        }
-                    }
+        let resourceChart;
+        let chartData = {
+            labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'],
+            datasets: [
+                {
+                    label: 'CPU Kullanımı (%)',
+                    data: [10, 25, 45, 30, 60, 40],
+                    borderColor: '#6366f1',
+                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4
                 },
-                scales: {
-                    x: {
-                        grid: {
-                            color: 'rgba(148, 163, 184, 0.1)'
-                        },
-                        ticks: {
-                            color: '#94a3b8'
-                        }
-                    },
-                    y: {
-                        grid: {
-                            color: 'rgba(148, 163, 184, 0.1)'
-                        },
-                        ticks: {
-                            color: '#94a3b8'
-                        },
-                        beginAtZero: true,
-                        max: 100
-                    }
-                },
-                interaction: {
-                    mode: 'index',
-                    intersect: false
+                {
+                    label: 'Bellek Kullanımı (%)',
+                    data: [30, 40, 35, 50, 65, 45],
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4
                 }
-            }
-        });
+            ]
+        };
+        
+        function initChart() {
+            resourceChart = new Chart(ctx, {
+                type: 'line',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                color: '#f8fafc',
+                                usePointStyle: true,
+                                pointStyle: 'circle'
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(148, 163, 184, 0.1)'
+                            },
+                            ticks: {
+                                color: '#94a3b8'
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: 'rgba(148, 163, 184, 0.1)'
+                            },
+                            ticks: {
+                                color: '#94a3b8'
+                            },
+                            beginAtZero: true,
+                            max: 100
+                        }
+                    },
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    }
+                }
+            });
+        }
+        
+        initChart();
         
         // Sistem bilgilerini yenile
         document.getElementById('refreshSystemInfo').addEventListener('click', function() {
@@ -240,22 +247,86 @@
             const icon = this.querySelector('i');
             icon.classList.add('fa-spin');
             
+            refreshStats();
+            
             setTimeout(() => {
                 this.disabled = false;
                 icon.classList.remove('fa-spin');
             }, 1000);
         });
         
+        // Etkinlik tablosunu güncelle
+        function updateEventsTable(events) {
+            const tbody = document.querySelector('#eventsTable tbody');
+            tbody.innerHTML = '';
+            
+            events.forEach(event => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${event.time}</td>
+                    <td>${event.event}</td>
+                    <td>${event.source}</td>
+                    <td><span class="badge bg-${event.status === 'success' ? 'success' : 'danger'}">${event.status === 'success' ? 'Başarılı' : 'Hata'}</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+        
+        // Sistem durumu grafiğini güncelle
+        function updateSystemChart(systemData) {
+            if (resourceChart) {
+                // Mevcut verileri tut ve kaydır
+                const cpuData = resourceChart.data.datasets[0].data;
+                const memData = resourceChart.data.datasets[1].data;
+                
+                // Yeni verileri ekle
+                cpuData.push(systemData.cpu_usage);
+                memData.push(systemData.memory_usage);
+                
+                // Veri sınırını aşarsa eski verileri sil
+                if (cpuData.length > 6) {
+                    cpuData.shift();
+                    memData.shift();
+                }
+                
+                resourceChart.update();
+            }
+        }
+        
         // İstatistikleri periyodik olarak güncelle
         function refreshStats() {
             fetch('/api/stats')
                 .then(response => response.json())
                 .then(data => {
-                    // Verileri güncelle
-                    console.log('Stats güncellendi:', data);
+                    // Container, image, volume, network sayılarını güncelle
+                    document.querySelector('.stat-card.containers .stat-value').textContent = data.containers.total;
+                    document.querySelector('.stat-card.containers .stat-tag.green').textContent = `${data.containers.running} çalışıyor`;
+                    document.querySelector('.stat-card.containers .stat-tag.red').textContent = `${data.containers.stopped} durmuş`;
+                    document.querySelector('.stat-card.images .stat-value').textContent = data.images;
+                    document.querySelector('.stat-card.volumes .stat-value').textContent = data.volumes;
+                    document.querySelector('.stat-card.networks .stat-value').textContent = data.networks;
+                    
+                    // Sistem grafiğini güncelle
+                    if (data.system) {
+                        updateSystemChart(data.system);
+                    }
+                    
+                    // Etkinlikler tablosunu güncelle
+                    if (data.events) {
+                        updateEventsTable(data.events);
+                    }
                 })
                 .catch(error => console.error('Stat alınamadı:', error));
         }
+        
+        // Etkinlikleri yenileme butonu
+        document.getElementById('refreshEvents').addEventListener('click', function(e) {
+            e.preventDefault();
+            refreshStats();
+        });
+        
+        // İlk açılışta bir kez güncelle
+        refreshStats();
         
         // Her 30 saniyede bir güncelle
         setInterval(refreshStats, 30000);
