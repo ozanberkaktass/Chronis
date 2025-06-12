@@ -40,13 +40,10 @@ app.config['TEMPLATES_AUTO_RELOAD'] = True
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet', ping_timeout=60, logger=True, engineio_logger=True)
 
 # Global değişken olarak Docker istemcisini tanımla
-client = None
-cli_client = None
+docker_client = None
 
-# Terminal oturumları için kaydı tutacak dictionary
+# Terminal oturumları
 terminal_sessions = {}
-active_terminals = {}
-recording_sessions = {}
 
 # Oturum kayıtları için klasör
 RECORDINGS_DIR = os.path.join(static_dir, 'recordings')
@@ -393,23 +390,25 @@ class DockerCLIClient:
             raise Exception(f"Container logları alınamadı: {e}")
 
 # Docker bağlantısını birkaç kez deneme
-def connect_to_docker(max_attempts=1, delay=1):
-    global client, cli_client
+def connect_to_docker(max_attempts=3, delay=1):
+    global docker_client
     
-    try:
-        # Önce CLI istemcisini başlat
-        cli_client = DockerCLIClient()
-        
-        # Docker CLI bağlantısını kontrol et
-        if cli_client.available:
-            print("Docker CLI bağlantısı kullanılacak")
+    for attempt in range(max_attempts):
+        try:
+            # Docker API istemcisini başlat
+            docker_client = docker.from_env()
+            
+            # Bağlantıyı test et
+            version = docker_client.version()
+            print(f"Docker'a bağlandı: {version.get('Version', 'bilinmiyor')}")
             return True
-        else:
-            print("Docker CLI erişimi başarısız, sınırlı işlevsellikle devam ediliyor.")
-            return False
-    except Exception as e:
-        print(f"Docker bağlantısı sırasında hata: {e}")
-        return False
+        except Exception as e:
+            print(f"Docker bağlantı hatası (deneme {attempt+1}/{max_attempts}): {str(e)}")
+            if attempt < max_attempts - 1:
+                time.sleep(delay)
+    
+    print("Docker'a bağlanılamadı, uygulama sınırlı işlevsellikle çalışacak.")
+    return False
 
 # Uygulama başlangıcında Docker'a bağlan
 connect_to_docker()
@@ -455,304 +454,314 @@ def set_terminal_size(fd, rows, cols):
 
 # Socket.IO terminal olayları
 @socketio.on('connect', namespace='/terminal')
-def connect():
-    """Yeni bağlantı"""
-    pass
+def terminal_connect():
+    print(f"Yeni terminal bağlantısı: {request.sid}")
 
 @socketio.on('disconnect', namespace='/terminal')
-def disconnect_terminal():
-    """Bağlantı kesildiğinde"""
-    if request.sid in active_terminals:
-        # Terminal prosesini sonlandır
-        if active_terminals[request.sid]['pid']:
+def terminal_disconnect():
+    print(f"Terminal bağlantısı kesildi: {request.sid}")
+    # Mevcut oturumu kapat
+    if request.sid in terminal_sessions:
+        session_info = terminal_sessions.get(request.sid)
+        close_terminal_session(session_info)
+        terminal_sessions.pop(request.sid, None)
+
+@socketio.on('create_session', namespace='/terminal')
+def create_terminal_session(data):
+    try:
+        print(f"Terminal oturumu oluşturma isteği: {data}")
+        session_id = str(uuid.uuid4())
+        session_type = data.get('type')
+        target = data.get('target')
+        host = data.get('host')
+        port = data.get('port')
+        username = data.get('username')
+        password = data.get('password')
+        
+        fd = None
+        pid = None
+        
+        # Bağlantı tipine göre terminal başlat
+        if session_type == 'container':
+            if not docker_client:
+                emit('connection_error', {'error': 'Docker bağlantısı yok'})
+                return
+            
+            # Container ID veya adına göre konteyner bul
+            container = None
             try:
-                os.kill(active_terminals[request.sid]['pid'], signal.SIGTERM)
-            except OSError:
-                pass
+                container = docker_client.containers.get(target)
+            except Exception as e:
+                emit('connection_error', {'error': f'Konteyner bulunamadı: {str(e)}'})
+                return
             
-        # Kayıt yapılıyorsa oturumu kaydet
-        if request.sid in recording_sessions and recording_sessions[request.sid]['recording']:
-            save_recording(request.sid)
-        
-        # Active terminal listesinden çıkar
-        del active_terminals[request.sid]
-    
-    # Kayıt durumunu temizle
-    if request.sid in recording_sessions:
-        del recording_sessions[request.sid]
-
-@socketio.on('start', namespace='/terminal')
-def start_terminal(data):
-    """Terminal oturumu başlat"""
-    connection_type = data.get('type')
-    
-    if connection_type == 'container':
-        # Container'da terminal başlat
-        container_id = data.get('containerId')
-        cmd = data.get('cmd', '/bin/bash')
-        
-        # Container çalışıyor mu kontrol et
-        try:
-            container = client.containers.get(container_id)
+            # Konteyner çalışıyor mu kontrol et
             if container.status != 'running':
-                emit('error', 'Container çalışmıyor.')
+                emit('connection_error', {'error': 'Konteyner çalışmıyor'})
                 return
-        except Exception as e:
-            emit('error', f'Container bulunamadı: {str(e)}')
-            return
+            
+            # Konteyner exec oluştur
+            exec_id = None
+            try:
+                exec_command = ['/bin/sh', '-c', 'if command -v bash >/dev/null 2>&1; then bash; else sh; fi']
+                exec_result = container.exec_run(
+                    exec_command,
+                    tty=True,
+                    stdin=True,
+                    socket=True,
+                    privileged=True,
+                    user='root'
+                )
+                exec_id = exec_result.output
+                
+                # PTY oluştur
+                fd, child_fd = pty.openpty()
+                
+                # Boyutu ayarla
+                fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 80, 0, 0))
+                
+                # Container exec ile bağlantı kur - burada tam implementasyon gerekiyor
+                def read_from_container():
+                    try:
+                        while True:
+                            data = exec_id.recv(1024).decode('utf-8', errors='ignore')
+                            if not data:
+                                break
+                            emit('terminal_output', {'output': data})
+                    except Exception as e:
+                        emit('connection_error', {'error': f'Okuma hatası: {str(e)}'})
+                
+                threading.Thread(target=read_from_container, daemon=True).start()
+                
+            except Exception as e:
+                emit('connection_error', {'error': f'Exec oluşturma hatası: {str(e)}'})
+                print(f"Konteyner exec hatası: {str(e)}")
+                return
         
-        # Exec oluştur ve başlat
-        try:
-            # PTY açılımı
-            master_fd, slave_fd = pty.openpty()
-            
-            # Docker exec komutu
-            exec_command = f"docker exec -it {container_id} {cmd}"
-            process = subprocess.Popen(
-                exec_command,
-                shell=True,
-                stdin=slave_fd,
-                stdout=slave_fd,
-                stderr=slave_fd,
-                close_fds=True
-            )
-            
-            # Terminal boyutunu ayarla
-            set_terminal_size(master_fd, data.get('rows', 24), data.get('cols', 80))
-            
-            # Aktif terminaller listesine ekle
-            active_terminals[request.sid] = {
-                'fd': master_fd,
-                'pid': process.pid,
-                'type': 'container',
-                'target': container_id,
-                'start_time': datetime.datetime.now()
-            }
-            
-            # Terminal verilerini okuma ve yönlendirme
-            create_terminal(master_fd, process.pid)
-            
-            # Kayıt başlat
-            if data.get('record', False):
-                recording_sessions[request.sid] = {
-                    'recording': True,
-                    'data': [],
-                    'type': 'container',
-                    'target': container_id,
-                    'start_time': datetime.datetime.now()
-                }
-            
-        except Exception as e:
-            emit('error', f'Terminal başlatılamadı: {str(e)}')
-            return
-    
-    elif connection_type == 'host':
-        # Host sistemde terminal başlat
-        try:
-            # Kullanıcının yetki kontrolü
-            if not session.get('admin'):
-                emit('error', 'Host terminal erişimi için yönetici hakları gerekiyor.')
+        elif session_type == 'host':
+            # Yerel sistem için PTY oluştur
+            try:
+                if os.name == 'posix':
+                    shell = os.environ.get('SHELL', '/bin/bash')
+                    fd, child_fd = pty.openpty()
+                    pid = os.fork()
+                    
+                    if pid == 0:  # Çocuk süreç
+                        os.close(fd)
+                        os.dup2(child_fd, 0)
+                        os.dup2(child_fd, 1)
+                        os.dup2(child_fd, 2)
+                        os.close(child_fd)
+                        
+                        env = os.environ.copy()
+                        env['TERM'] = 'xterm-256color'
+                        
+                        os.execvpe(shell, [shell], env)
+                    else:  # Ana süreç
+                        os.close(child_fd)
+                        fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 80, 0, 0))
+                else:
+                    # Windows için terminal başlatma - subprocess kullanabilir
+                    pass
+            except Exception as e:
+                emit('connection_error', {'error': f'PTY oluşturma hatası: {str(e)}'})
+                print(f"PTY hatası: {str(e)}")
                 return
-            
-            # PTY açılımı
-            master_fd, slave_fd = pty.openpty()
-            
-            # Shell başlat
-            process = subprocess.Popen(
-                ['/bin/bash'],
-                stdin=slave_fd,
-                stdout=slave_fd,
-                stderr=slave_fd,
-                close_fds=True
-            )
-            
-            # Terminal boyutunu ayarla
-            set_terminal_size(master_fd, data.get('rows', 24), data.get('cols', 80))
-            
-            # Aktif terminaller listesine ekle
-            active_terminals[request.sid] = {
-                'fd': master_fd,
-                'pid': process.pid,
-                'type': 'host',
-                'target': 'host',
-                'start_time': datetime.datetime.now()
-            }
-            
-            # Terminal verilerini okuma ve yönlendirme
-            create_terminal(master_fd, process.pid)
-            
-            # Kayıt başlat
-            if data.get('record', False):
-                recording_sessions[request.sid] = {
-                    'recording': True,
-                    'data': [],
-                    'type': 'host',
-                    'target': 'Host',
-                    'start_time': datetime.datetime.now()
-                }
-            
-        except Exception as e:
-            emit('error', f'Host terminal başlatılamadı: {str(e)}')
-            return
-    
-    elif connection_type == 'ssh':
-        # SSH bağlantısı başlat
-        try:
-            # SSH bilgilerini al
-            host = data.get('host')
-            port = data.get('port', 22)
-            username = data.get('username')
-            auth_type = data.get('authType')
-            
-            # Kimlik doğrulama için parametreler
-            ssh_command = f"ssh {username}@{host} -p {port}"
-            
-            if auth_type == 'key':
-                # SSH anahtarı kullanımı için
-                key_content = data.get('key', '')
-                
-                # Geçici anahtar dosyası oluştur
-                key_file = os.path.join(RECORDINGS_DIR, f"temp_key_{uuid.uuid4().hex}")
-                with open(key_file, 'w') as f:
-                    f.write(key_content)
-                os.chmod(key_file, 0o600)  # Dosya izinlerini ayarla
-                
-                ssh_command += f" -i {key_file}"
-            
-            # PTY açılımı
-            master_fd, slave_fd = pty.openpty()
-            
-            # SSH komutu başlat
-            process = subprocess.Popen(
-                ssh_command,
-                shell=True,
-                stdin=slave_fd,
-                stdout=slave_fd,
-                stderr=slave_fd,
-                close_fds=True
-            )
-            
-            # Terminal boyutunu ayarla
-            set_terminal_size(master_fd, data.get('rows', 24), data.get('cols', 80))
-            
-            # Aktif terminaller listesine ekle
-            active_terminals[request.sid] = {
-                'fd': master_fd,
-                'pid': process.pid,
-                'type': 'ssh',
-                'target': f"{username}@{host}:{port}",
-                'key_file': key_file if auth_type == 'key' else None,
-                'start_time': datetime.datetime.now()
-            }
-            
-            # Terminal verilerini okuma ve yönlendirme
-            create_terminal(master_fd, process.pid)
-            
-            # Kayıt başlat
-            if data.get('record', False):
-                recording_sessions[request.sid] = {
-                    'recording': True,
-                    'data': [],
-                    'type': 'ssh',
-                    'target': f"{username}@{host}",
-                    'start_time': datetime.datetime.now()
-                }
-            
-        except Exception as e:
-            emit('error', f'SSH bağlantısı başlatılamadı: {str(e)}')
-            return
-    
-    else:
-        emit('error', 'Geçersiz bağlantı tipi.')
+        
+        elif session_type == 'ssh':
+            # SSH bağlantısı - paramiko veya başka bir kütüphane ile
+            pass
+        
+        # Oturum bilgilerini kaydet
+        terminal_sessions[request.sid] = {
+            'session_id': session_id,
+            'type': session_type,
+            'target': target,
+            'host': host,
+            'fd': fd,
+            'pid': pid,
+            'recording': False,
+            'start_time': datetime.datetime.now(),
+            'recording_data': []
+        }
+        
+        # Oturum oluşturuldu bilgisi gönder
+        emit('session_created', {'session_id': session_id})
+        
+        print(f"Terminal oturumu oluşturuldu: {session_id}")
+        
+        # Terminal kayıt dizini oluştur
+        os.makedirs('terminal_recordings', exist_ok=True)
+        
+    except Exception as e:
+        emit('connection_error', {'error': f'Oturum oluşturma hatası: {str(e)}'})
+        print(f"Oturum oluşturma hatası: {str(e)}")
+        traceback.print_exc()
 
-@socketio.on('data', namespace='/terminal')
+@socketio.on('terminal_input', namespace='/terminal')
 def handle_terminal_input(data):
-    """Terminal girdisi al ve işle"""
-    if request.sid in active_terminals:
-        fd = active_terminals[request.sid]['fd']
-        try:
-            os.write(fd, data.encode())
-            
-            # Kayıt yapılıyorsa verileri kaydet
-            if request.sid in recording_sessions and recording_sessions[request.sid]['recording']:
-                recording_sessions[request.sid]['data'].append({
-                    'type': 'input',
-                    'data': data,
-                    'time': datetime.datetime.now().isoformat()
-                })
+    try:
+        print(f"Terminal input alındı: {data}")
+        session_id = data.get('session_id')
+        input_data = data.get('data')
+        
+        # Oturumu bul
+        session_info = None
+        for sid, session in terminal_sessions.items():
+            if session.get('session_id') == session_id:
+                session_info = session
+                break
+        
+        if not session_info:
+            emit('connection_error', {'error': 'Oturum bulunamadı'})
+            return
+        
+        # Oturum tipine göre input gönder
+        if session_info['type'] == 'container':
+            if 'exec_id' in session_info:
+                try:
+                    session_info['exec_id'].send(input_data.encode('utf-8'))
+                except Exception as e:
+                    emit('connection_error', {'error': f'Konteyner input hatası: {str(e)}'})
+        
+        elif session_info['type'] == 'host':
+            if session_info.get('fd'):
+                try:
+                    os.write(session_info['fd'], input_data.encode('utf-8'))
+                except Exception as e:
+                    emit('connection_error', {'error': f'Host input hatası: {str(e)}'})
+        
+        # Kayıt yapılıyorsa verileri ekle
+        if session_info.get('recording', False):
+            session_info['recording_data'].append({
+                'timestamp': time.time() - session_info.get('recording_start_time', 0),
+                'data': input_data,
+                'type': 'input'
+            })
+    
+    except Exception as e:
+        emit('connection_error', {'error': f'Terminal input hatası: {str(e)}'})
+        print(f"Terminal input hatası: {str(e)}")
+        traceback.print_exc()
+
+@socketio.on('terminal_resize', namespace='/terminal')
+def handle_terminal_resize(data):
+    try:
+        session_id = data.get('session_id')
+        cols = data.get('cols', 80)
+        rows = data.get('rows', 24)
+        
+        # Oturumu bul
+        session_info = None
+        for sid, session in terminal_sessions.items():
+            if session.get('session_id') == session_id:
+                session_info = session
+                break
+        
+        if not session_info:
+            return
+        
+        # Oturum tipine göre boyut ayarla
+        if session_info['type'] == 'host' and session_info.get('fd'):
+            try:
+                fcntl.ioctl(session_info['fd'], termios.TIOCSWINSZ, 
+                            struct.pack("HHHH", rows, cols, 0, 0))
+            except Exception as e:
+                print(f"Terminal boyut değiştirme hatası: {str(e)}")
+    
+    except Exception as e:
+        print(f"Terminal boyut değiştirme hatası: {str(e)}")
+        traceback.print_exc()
+
+@socketio.on('close_session', namespace='/terminal')
+def close_terminal_session(data):
+    try:
+        session_id = data.get('session_id')
+        
+        # Oturumu bul
+        session_info = None
+        for sid, session in terminal_sessions.items():
+            if session.get('session_id') == session_id:
+                session_info = session
+                sid_to_remove = sid
+                break
+        
+        if not session_info:
+            return
+        
+        # Oturum tipine göre kapat
+        if session_info['type'] == 'container':
+            if 'exec_id' in session_info:
+                try:
+                    session_info['exec_id'].close()
+                except:
+                    pass
+        
+        elif session_info['type'] == 'host':
+            if session_info.get('pid'):
+                try:
+                    os.kill(session_info['pid'], signal.SIGTERM)
+                except:
+                    pass
                 
-        except (OSError, IOError) as e:
-            emit('error', f'Veri yazılırken hata oluştu: {str(e)}')
-
-@socketio.on('resize', namespace='/terminal')
-def resize_terminal(data):
-    """Terminal boyutunu değiştir"""
-    if request.sid in active_terminals:
-        fd = active_terminals[request.sid]['fd']
-        try:
-            set_terminal_size(fd, data.get('rows', 24), data.get('cols', 80))
-        except (OSError, IOError) as e:
-            emit('error', f'Terminal boyutu değiştirilirken hata oluştu: {str(e)}')
-
-@socketio.on('toggleRecord', namespace='/terminal')
-def toggle_recording(data):
-    """Terminal kaydını başlat/durdur"""
-    recording = data.get('recording', False)
+            if session_info.get('fd'):
+                try:
+                    os.close(session_info['fd'])
+                except:
+                    pass
+        
+        # Kayıt yapılıyorsa durdur
+        if session_info.get('recording', False):
+            session_info['recording'] = False
+            session_info['end_time'] = datetime.datetime.now()
+            
+            # Kayıt dosyasını oluştur
+            recording_file = os.path.join('terminal_recordings', f"{session_id}.json")
+            with open(recording_file, 'w') as f:
+                json.dump({
+                    'session_id': session_id,
+                    'type': session_info.get('type'),
+                    'target': session_info.get('target'),
+                    'host': session_info.get('host'),
+                    'start_time': session_info.get('start_time').isoformat(),
+                    'end_time': session_info.get('end_time').isoformat(),
+                    'frames': session_info.get('recording_data', [])
+                }, f)
+        
+        # Oturumu sil
+        terminal_sessions.pop(sid_to_remove, None)
     
-    if request.sid in active_terminals:
-        # Kayıt var mı kontrol et
-        if request.sid not in recording_sessions:
-            # Yeni kayıt oluştur
-            recording_sessions[request.sid] = {
-                'recording': recording,
-                'data': [],
-                'type': active_terminals[request.sid]['type'],
-                'target': active_terminals[request.sid]['target'],
-                'start_time': datetime.datetime.now()
-            }
-        else:
-            # Mevcut kaydı güncelle
-            if recording and not recording_sessions[request.sid]['recording']:
-                # Kaydı başlat
-                recording_sessions[request.sid]['recording'] = True
-            elif not recording and recording_sessions[request.sid]['recording']:
-                # Kaydı durdur ve kaydet
-                recording_sessions[request.sid]['recording'] = False
-                save_recording(request.sid)
+    except Exception as e:
+        print(f"Oturum kapatma hatası: {str(e)}")
+        traceback.print_exc()
 
-def save_recording(sid):
-    """Terminal kaydını kaydet"""
-    if sid in recording_sessions:
-        recording = recording_sessions[sid]
-        recording_id = uuid.uuid4().hex
+@socketio.on('start_recording', namespace='/terminal')
+def start_terminal_recording(data):
+    try:
+        session_id = data.get('session_id')
         
-        # Kayıt meta verisi
-        metadata = {
-            'id': recording_id,
-            'type': recording['type'],
-            'target': recording['target'],
-            'start_time': recording['start_time'].isoformat(),
-            'end_time': datetime.datetime.now().isoformat(),
-            'user': session.get('username', 'anonymous')
-        }
+        # Oturumu bul
+        session_info = None
+        for sid, session in terminal_sessions.items():
+            if session.get('session_id') == session_id:
+                session_info = session
+                break
         
-        # Kayıt verisi
-        recording_data = {
-            'metadata': metadata,
-            'events': recording['data']
-        }
+        if not session_info:
+            emit('connection_error', {'error': 'Oturum bulunamadı'})
+            return
         
-        # Kayıt dosyasını oluştur
-        recording_file = os.path.join(RECORDINGS_DIR, f"{recording_id}.json")
-        with open(recording_file, 'w') as f:
-            json.dump(recording_data, f)
+        # Kayıt başlat
+        session_info['recording'] = True
+        session_info['recording_start_time'] = time.time()
+        session_info['recording_data'] = []
         
-        # Terminal oturumları listesine ekle
-        terminal_sessions[recording_id] = metadata
-        
-        return recording_id
+        emit('recording_started', {'session_id': session_id})
     
-    return None
+    except Exception as e:
+        emit('connection_error', {'error': f'Kayıt başlatma hatası: {str(e)}'})
+        print(f"Kayıt başlatma hatası: {str(e)}")
+        traceback.print_exc()
 
 # Terminal sayfası
 @app.route('/terminal')
@@ -765,8 +774,8 @@ def terminal():
 def get_running_containers():
     """Çalışan container listesini getir"""
     try:
-        if client:
-            containers = client.containers.list(filters={"status": "running"})
+        if docker_client:
+            containers = docker_client.containers.list(filters={"status": "running"})
             container_list = []
             
             for container in containers:
@@ -774,18 +783,6 @@ def get_running_containers():
                     'id': container.id,
                     'name': container.name
                 })
-            
-            return jsonify(container_list)
-        elif cli_client and cli_client.available:
-            containers = cli_client.containers_list(all=False)
-            container_list = []
-            
-            for container in containers:
-                if container.status == 'running':
-                    container_list.append({
-                        'id': container.id,
-                        'name': container.name
-                    })
             
             return jsonify(container_list)
         else:
@@ -860,31 +857,13 @@ def dashboard():
     }
     
     try:
-        if client:
+        if docker_client:
             # Docker API ile istatistikleri al
-            containers = client.containers.list(all=True)
+            containers = docker_client.containers.list(all=True)
             running_containers = [c for c in containers if c.status == 'running']
-            images = client.images.list()
-            volumes = client.volumes.list()
-            networks = client.networks.list()
-            
-            stats = {
-                'containers': {
-                    'total': len(containers),
-                    'running': len(running_containers),
-                    'stopped': len(containers) - len(running_containers)
-                },
-                'images': len(images),
-                'volumes': len(volumes),
-                'networks': len(networks)
-            }
-        elif cli_client and cli_client.available:
-            # CLI ile istatistikleri al
-            containers = cli_client.containers_list(all=True)
-            running_containers = [c for c in containers if c.status == 'running']
-            images = cli_client.images_list()
-            volumes = cli_client.volumes_list()
-            networks = cli_client.networks_list()
+            images = docker_client.images.list()
+            volumes = docker_client.volumes.list()
+            networks = docker_client.networks.list()
             
             stats = {
                 'containers': {
@@ -907,10 +886,8 @@ def dashboard():
 @app.route('/containers')
 def container_list():
     try:
-        if client:
-            containers = client.containers.list(all=True)
-        elif cli_client and cli_client.available:
-            containers = cli_client.containers_list(all=True)
+        if docker_client:
+            containers = docker_client.containers.list(all=True)
         else:
             containers = []
             flash("Docker bağlantısı kurulamadı.", "error")
@@ -923,10 +900,8 @@ def container_list():
 @app.route('/containers/<id>')
 def container_detail(id):
     try:
-        if client:
-            container = client.containers.get(id)
-        elif cli_client and cli_client.available:
-            container = cli_client.get_container(id)
+        if docker_client:
+            container = docker_client.containers.get(id)
         else:
             flash("Docker bağlantısı kurulamadı.", "error")
             return redirect(url_for('container_list'))
@@ -939,11 +914,9 @@ def container_detail(id):
 @app.route('/containers/start/<id>', methods=['POST'])
 def start_container(id):
     try:
-        if client:
-            container = client.containers.get(id)
+        if docker_client:
+            container = docker_client.containers.get(id)
             container.start()
-        elif cli_client and cli_client.available:
-            cli_client.container_start(id)
         else:
             flash("Docker bağlantısı kurulamadı.", "error")
             return redirect(url_for('container_list'))
@@ -956,11 +929,9 @@ def start_container(id):
 @app.route('/containers/stop/<id>', methods=['POST'])
 def stop_container(id):
     try:
-        if client:
-            container = client.containers.get(id)
+        if docker_client:
+            container = docker_client.containers.get(id)
             container.stop()
-        elif cli_client and cli_client.available:
-            cli_client.container_stop(id)
         else:
             flash("Docker bağlantısı kurulamadı.", "error")
             return redirect(url_for('container_list'))
@@ -973,11 +944,9 @@ def stop_container(id):
 @app.route('/containers/restart/<id>', methods=['POST'])
 def restart_container(id):
     try:
-        if client:
-            container = client.containers.get(id)
+        if docker_client:
+            container = docker_client.containers.get(id)
             container.restart()
-        elif cli_client and cli_client.available:
-            cli_client.container_restart(id)
         else:
             flash("Docker bağlantısı kurulamadı.", "error")
             return redirect(url_for('container_list'))
@@ -990,11 +959,9 @@ def restart_container(id):
 @app.route('/containers/remove/<id>', methods=['POST'])
 def remove_container(id):
     try:
-        if client:
-            container = client.containers.get(id)
+        if docker_client:
+            container = docker_client.containers.get(id)
             container.remove(force=True)
-        elif cli_client and cli_client.available:
-            cli_client.container_remove(id, force=True)
         else:
             flash("Docker bağlantısı kurulamadı.", "error")
             return redirect(url_for('container_list'))
@@ -1007,12 +974,9 @@ def remove_container(id):
 @app.route('/containers/logs/<id>')
 def container_logs(id):
     try:
-        if client:
-            container = client.containers.get(id)
+        if docker_client:
+            container = docker_client.containers.get(id)
             logs = container.logs(tail=100).decode('utf-8')
-        elif cli_client and cli_client.available:
-            container = cli_client.get_container(id)
-            logs = cli_client.container_logs(id, tail=100)
         else:
             flash("Docker bağlantısı kurulamadı.", "error")
             return redirect(url_for('container_list'))
@@ -1025,10 +989,8 @@ def container_logs(id):
 @app.route('/images')
 def image_list():
     try:
-        if client:
-            images = client.images.list()
-        elif cli_client and cli_client.available:
-            images = cli_client.images_list()
+        if docker_client:
+            images = docker_client.images.list()
         else:
             images = []
             flash("Docker bağlantısı kurulamadı.", "error")
@@ -1041,10 +1003,8 @@ def image_list():
 @app.route('/networks')
 def network_list():
     try:
-        if client:
-            networks = client.networks.list()
-        elif cli_client and cli_client.available:
-            networks = cli_client.networks_list()
+        if docker_client:
+            networks = docker_client.networks.list()
         else:
             networks = []
             flash("Docker bağlantısı kurulamadı.", "error")
@@ -1057,10 +1017,8 @@ def network_list():
 @app.route('/volumes')
 def volume_list():
     try:
-        if client:
-            volumes = client.volumes.list()
-        elif cli_client and cli_client.available:
-            volumes = cli_client.volumes_list()
+        if docker_client:
+            volumes = docker_client.volumes.list()
         else:
             volumes = []
             flash("Docker bağlantısı kurulamadı.", "error")
@@ -1115,29 +1073,12 @@ def api_stats():
             ]
         }
         
-        if client:
-            containers = client.containers.list(all=True)
+        if docker_client:
+            containers = docker_client.containers.list(all=True)
             running_containers = [c for c in containers if c.status == 'running']
-            images = client.images.list()
-            volumes = client.volumes.list()
-            networks = client.networks.list()
-            
-            stats.update({
-                'containers': {
-                    'total': len(containers),
-                    'running': len(running_containers),
-                    'stopped': len(containers) - len(running_containers)
-                },
-                'images': len(images),
-                'volumes': len(volumes),
-                'networks': len(networks)
-            })
-        elif cli_client and cli_client.available:
-            containers = cli_client.containers_list(all=True)
-            running_containers = [c for c in containers if c.status == 'running']
-            images = cli_client.images_list()
-            volumes = cli_client.volumes_list()
-            networks = cli_client.networks_list()
+            images = docker_client.images.list()
+            volumes = docker_client.volumes.list()
+            networks = docker_client.networks.list()
             
             stats.update({
                 'containers': {
@@ -1158,21 +1099,13 @@ def api_stats():
 def api_status():
     """Docker bağlantı durumunu kontrol et"""
     try:
-        if client:
-            version = client.version()
+        if docker_client:
+            version = docker_client.version()
             return jsonify({
                 'status': 'connected',
                 'client': 'api',
                 'version': version.get('Version', 'bilinmiyor'),
                 'api_version': version.get('ApiVersion', 'bilinmiyor')
-            })
-        elif cli_client and cli_client.available:
-            version = cli_client.version()
-            return jsonify({
-                'status': 'connected',
-                'client': 'cli',
-                'version': version.get('Server', {}).get('Version', 'bilinmiyor'),
-                'api_version': version.get('Server', {}).get('ApiVersion', 'bilinmiyor')
             })
         else:
             return jsonify({'status': 'disconnected', 'error': 'Docker bağlantısı kurulamadı'})

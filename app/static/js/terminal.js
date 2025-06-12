@@ -263,9 +263,36 @@ document.addEventListener('DOMContentLoaded', function() {
             };
         });
         
-        // Terminal veri alındığında
-        socket.on('data', (data) => {
-            term.write(data);
+        // Terminal çıktısı
+        socket.on('terminal_output', function(data) {
+            console.log('Terminal çıktısı alındı:', data);
+            if (data && data.output) {
+                term.write(data.output);
+            } else {
+                console.error('Terminal çıktısı alınamadı veya boş:', data);
+            }
+        });
+        
+        // Hata ayıklama için fazladan olay dinleyicileri
+        socket.on('connect_error', function(error) {
+            console.error('Bağlantı hatası:', error);
+            term.writeln(`\r\n\x1b[31mBağlantı hatası: ${error.message}\x1b[0m`);
+        });
+        
+        socket.on('connect_timeout', function() {
+            console.error('Bağlantı zaman aşımı');
+            term.writeln('\r\n\x1b[31mBağlantı zaman aşımına uğradı\x1b[0m');
+        });
+        
+        socket.on('error', function(error) {
+            console.error('Socket hatası:', error);
+            term.writeln(`\r\n\x1b[31mSocket hatası: ${error.message || error}\x1b[0m`);
+        });
+        
+        // Bağlantı hatası
+        socket.on('connection_error', function(data) {
+            console.error('Bağlantı hatası:', data);
+            term.writeln(`\r\n\x1b[31mBağlantı hatası: ${data.message}\x1b[0m`);
         });
         
         // Terminal veri gönderildiğinde
@@ -276,12 +303,6 @@ document.addEventListener('DOMContentLoaded', function() {
         // Bağlantı kesildiğinde
         socket.on('disconnect', () => {
             term.writeln('\r\n\nBağlantı kesildi.');
-            resetConnection();
-        });
-        
-        // Hata durumunda
-        socket.on('error', (error) => {
-            term.writeln(`\r\n\nHata: ${error}`);
             resetConnection();
         });
     });
