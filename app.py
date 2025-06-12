@@ -5,6 +5,8 @@ import json
 from datetime import datetime
 import time
 import subprocess
+import json
+import re
 
 # Flask uygulamasını başlat ve şablon klasörünü doğru şekilde ayarla
 template_dir = os.path.abspath('app/templates')
@@ -14,10 +16,206 @@ app.secret_key = "chronis_gizli_anahtar"  # Gerçek uygulamada değiştirin
 
 # Global değişken olarak Docker istemcisini tanımla
 client = None
+cli_client = None
+
+# Docker CLI tabanlı alternatif istemci
+class DockerCLIClient:
+    def __init__(self):
+        # Docker CLI'ın varlığını kontrol et
+        try:
+            output = subprocess.check_output(['docker', 'version', '--format', '{{json .}}'])
+            self.available = True
+            print("Docker CLI erişimi başarılı")
+        except Exception as e:
+            self.available = False
+            print(f"Docker CLI erişimi başarısız: {e}")
+    
+    def version(self):
+        """Docker versiyonunu al"""
+        try:
+            output = subprocess.check_output(['docker', 'version', '--format', '{{json .}}'])
+            return json.loads(output)
+        except Exception as e:
+            print(f"Versiyon alınamadı: {e}")
+            return {"Version": "bilinmiyor", "ApiVersion": "bilinmiyor"}
+    
+    def containers_list(self, all=False):
+        """Container listesini al"""
+        try:
+            cmd = ['docker', 'ps', '--format', '{{json .}}']
+            if all:
+                cmd.append('-a')
+            
+            output = subprocess.check_output(cmd, universal_newlines=True)
+            containers = []
+            
+            # Her satırı ayrı bir JSON olarak işle
+            for line in output.strip().split('\n'):
+                if line:
+                    container_data = json.loads(line)
+                    container = type('obj', (object,), {
+                        'id': container_data.get('ID', ''),
+                        'name': container_data.get('Names', ''),
+                        'image': container_data.get('Image', ''),
+                        'status': container_data.get('Status', ''),
+                        'command': container_data.get('Command', ''),
+                        'created': container_data.get('CreatedAt', ''),
+                        'ports': container_data.get('Ports', '')
+                    })
+                    containers.append(container)
+            
+            return containers
+        except Exception as e:
+            print(f"Container listesi alınamadı: {e}")
+            return []
+    
+    def images_list(self):
+        """Image listesini al"""
+        try:
+            cmd = ['docker', 'images', '--format', '{{json .}}']
+            output = subprocess.check_output(cmd, universal_newlines=True)
+            images = []
+            
+            for line in output.strip().split('\n'):
+                if line:
+                    image_data = json.loads(line)
+                    image = type('obj', (object,), {
+                        'id': image_data.get('ID', ''),
+                        'tags': [image_data.get('Repository', '') + ':' + image_data.get('Tag', '')],
+                        'created': image_data.get('CreatedAt', ''),
+                        'size': image_data.get('Size', '')
+                    })
+                    images.append(image)
+            
+            return images
+        except Exception as e:
+            print(f"Image listesi alınamadı: {e}")
+            return []
+    
+    def networks_list(self):
+        """Network listesini al"""
+        try:
+            cmd = ['docker', 'network', 'ls', '--format', '{{json .}}']
+            output = subprocess.check_output(cmd, universal_newlines=True)
+            networks = []
+            
+            for line in output.strip().split('\n'):
+                if line:
+                    network_data = json.loads(line)
+                    network = type('obj', (object,), {
+                        'id': network_data.get('ID', ''),
+                        'name': network_data.get('Name', ''),
+                        'driver': network_data.get('Driver', ''),
+                        'scope': network_data.get('Scope', '')
+                    })
+                    networks.append(network)
+            
+            return networks
+        except Exception as e:
+            print(f"Network listesi alınamadı: {e}")
+            return []
+    
+    def volumes_list(self):
+        """Volume listesini al"""
+        try:
+            cmd = ['docker', 'volume', 'ls', '--format', '{{json .}}']
+            output = subprocess.check_output(cmd, universal_newlines=True)
+            volumes = []
+            
+            for line in output.strip().split('\n'):
+                if line:
+                    volume_data = json.loads(line)
+                    volume = type('obj', (object,), {
+                        'name': volume_data.get('Name', ''),
+                        'driver': volume_data.get('Driver', ''),
+                        'mountpoint': ''  # CLI ile mountpoint bilgisi alınamıyor
+                    })
+                    volumes.append(volume)
+            
+            return volumes
+        except Exception as e:
+            print(f"Volume listesi alınamadı: {e}")
+            return []
+    
+    def get_container(self, container_id):
+        """Container detaylarını al"""
+        try:
+            cmd = ['docker', 'inspect', container_id]
+            output = subprocess.check_output(cmd, universal_newlines=True)
+            data = json.loads(output)[0]
+            
+            container = type('obj', (object,), {
+                'id': data.get('Id', ''),
+                'name': data.get('Name', '').lstrip('/'),
+                'image': data.get('Config', {}).get('Image', ''),
+                'status': data.get('State', {}).get('Status', ''),
+                'created': data.get('Created', ''),
+                'ports': str(data.get('NetworkSettings', {}).get('Ports', {})),
+                'labels': data.get('Config', {}).get('Labels', {}),
+                'command': str(data.get('Config', {}).get('Cmd', [])),
+                'env': data.get('Config', {}).get('Env', [])
+            })
+            
+            return container
+        except Exception as e:
+            print(f"Container detayları alınamadı: {e}")
+            raise Exception(f"Container bulunamadı: {e}")
+    
+    def container_start(self, container_id):
+        """Container'ı başlat"""
+        try:
+            subprocess.check_call(['docker', 'start', container_id])
+            return True
+        except Exception as e:
+            print(f"Container başlatılamadı: {e}")
+            raise Exception(f"Container başlatılamadı: {e}")
+    
+    def container_stop(self, container_id):
+        """Container'ı durdur"""
+        try:
+            subprocess.check_call(['docker', 'stop', container_id])
+            return True
+        except Exception as e:
+            print(f"Container durdurulamadı: {e}")
+            raise Exception(f"Container durdurulamadı: {e}")
+    
+    def container_restart(self, container_id):
+        """Container'ı yeniden başlat"""
+        try:
+            subprocess.check_call(['docker', 'restart', container_id])
+            return True
+        except Exception as e:
+            print(f"Container yeniden başlatılamadı: {e}")
+            raise Exception(f"Container yeniden başlatılamadı: {e}")
+    
+    def container_remove(self, container_id, force=False):
+        """Container'ı sil"""
+        try:
+            cmd = ['docker', 'rm', container_id]
+            if force:
+                cmd.append('-f')
+            subprocess.check_call(cmd)
+            return True
+        except Exception as e:
+            print(f"Container silinemedi: {e}")
+            raise Exception(f"Container silinemedi: {e}")
+    
+    def container_logs(self, container_id, tail=100):
+        """Container loglarını al"""
+        try:
+            cmd = ['docker', 'logs', '--tail', str(tail), container_id]
+            logs = subprocess.check_output(cmd, universal_newlines=True)
+            return logs
+        except Exception as e:
+            print(f"Container logları alınamadı: {e}")
+            raise Exception(f"Container logları alınamadı: {e}")
 
 # Docker bağlantısını birkaç kez deneme
 def connect_to_docker(max_attempts=5, delay=2):
-    global client
+    global client, cli_client
+    
+    # Önce CLI istemcisini başlat
+    cli_client = DockerCLIClient()
     
     for attempt in range(max_attempts):
         try:
@@ -54,12 +252,11 @@ def connect_to_docker(max_attempts=5, delay=2):
             except Exception as e:
                 print(f"from_env ile bağlantı başarısız: {e}")
             
-            # Komut satırından Docker sürümünü al
-            try:
-                version_output = subprocess.check_output(['docker', 'version', '--format', '{{json .}}'])
-                print(f"Docker CLI bağlantısı başarılı: {version_output}")
-                # CLI kullanılabilir durumda, API olmasa da bazı işlemleri CLI ile yapabiliriz
-            except:
+            # Docker CLI bağlantısını kontrol et
+            if cli_client.available:
+                print("Docker CLI bağlantısı kullanılacak")
+                # Python istemcisi başarısız olsa da CLI istemcisi kullanılabilir
+            else:
                 print("Docker CLI erişimi başarısız")
             
             print(f"Deneme {attempt+1}/{max_attempts} başarısız, {delay} saniye bekleyip tekrar deneniyor...")
@@ -69,8 +266,12 @@ def connect_to_docker(max_attempts=5, delay=2):
             print(f"Deneme {attempt+1}/{max_attempts} sırasında hata: {e}")
             time.sleep(delay)
     
-    print("Docker bağlantısı kurulamadı. Sınırlı işlevsellikle devam ediliyor.")
-    return False
+    if cli_client.available:
+        print("Docker Python istemcisi başarısız, CLI istemcisi ile devam ediliyor.")
+        return True
+    else:
+        print("Docker bağlantısı kurulamadı. Sınırlı işlevsellikle devam ediliyor.")
+        return False
 
 # Uygulama başlangıcında Docker'a bağlan
 connect_to_docker()
@@ -95,12 +296,30 @@ def dashboard():
     
     try:
         if client:
-            # Docker istatistikleri
+            # Docker API ile istatistikleri al
             containers = client.containers.list(all=True)
             running_containers = [c for c in containers if c.status == 'running']
             images = client.images.list()
             volumes = client.volumes.list()
             networks = client.networks.list()
+            
+            stats = {
+                'containers': {
+                    'total': len(containers),
+                    'running': len(running_containers),
+                    'stopped': len(containers) - len(running_containers)
+                },
+                'images': len(images),
+                'volumes': len(volumes),
+                'networks': len(networks)
+            }
+        elif cli_client and cli_client.available:
+            # CLI ile istatistikleri al
+            containers = cli_client.containers_list(all=True)
+            running_containers = [c for c in containers if 'Up' in c.status]
+            images = cli_client.images_list()
+            volumes = cli_client.volumes_list()
+            networks = cli_client.networks_list()
             
             stats = {
                 'containers': {
@@ -123,7 +342,14 @@ def dashboard():
 @app.route('/containers')
 def container_list():
     try:
-        containers = client.containers.list(all=True)
+        if client:
+            containers = client.containers.list(all=True)
+        elif cli_client and cli_client.available:
+            containers = cli_client.containers_list(all=True)
+        else:
+            containers = []
+            flash("Docker bağlantısı kurulamadı.", "error")
+            
         return render_template('containers.html', containers=containers)
     except Exception as e:
         flash(f"Container listesi alınamadı: {e}", "error")
@@ -132,7 +358,14 @@ def container_list():
 @app.route('/containers/<id>')
 def container_detail(id):
     try:
-        container = client.containers.get(id)
+        if client:
+            container = client.containers.get(id)
+        elif cli_client and cli_client.available:
+            container = cli_client.get_container(id)
+        else:
+            flash("Docker bağlantısı kurulamadı.", "error")
+            return redirect(url_for('container_list'))
+            
         return render_template('container_detail.html', container=container)
     except Exception as e:
         flash(f"Container detayları alınamadı: {e}", "error")
@@ -141,9 +374,16 @@ def container_detail(id):
 @app.route('/containers/start/<id>', methods=['POST'])
 def start_container(id):
     try:
-        container = client.containers.get(id)
-        container.start()
-        flash(f"Container {container.name} başlatıldı", "success")
+        if client:
+            container = client.containers.get(id)
+            container.start()
+        elif cli_client and cli_client.available:
+            cli_client.container_start(id)
+        else:
+            flash("Docker bağlantısı kurulamadı.", "error")
+            return redirect(url_for('container_list'))
+            
+        flash(f"Container başlatıldı", "success")
     except Exception as e:
         flash(f"Container başlatılamadı: {e}", "error")
     return redirect(url_for('container_list'))
@@ -151,9 +391,16 @@ def start_container(id):
 @app.route('/containers/stop/<id>', methods=['POST'])
 def stop_container(id):
     try:
-        container = client.containers.get(id)
-        container.stop()
-        flash(f"Container {container.name} durduruldu", "success")
+        if client:
+            container = client.containers.get(id)
+            container.stop()
+        elif cli_client and cli_client.available:
+            cli_client.container_stop(id)
+        else:
+            flash("Docker bağlantısı kurulamadı.", "error")
+            return redirect(url_for('container_list'))
+            
+        flash(f"Container durduruldu", "success")
     except Exception as e:
         flash(f"Container durdurulamadı: {e}", "error")
     return redirect(url_for('container_list'))
@@ -161,9 +408,16 @@ def stop_container(id):
 @app.route('/containers/restart/<id>', methods=['POST'])
 def restart_container(id):
     try:
-        container = client.containers.get(id)
-        container.restart()
-        flash(f"Container {container.name} yeniden başlatıldı", "success")
+        if client:
+            container = client.containers.get(id)
+            container.restart()
+        elif cli_client and cli_client.available:
+            cli_client.container_restart(id)
+        else:
+            flash("Docker bağlantısı kurulamadı.", "error")
+            return redirect(url_for('container_list'))
+            
+        flash(f"Container yeniden başlatıldı", "success")
     except Exception as e:
         flash(f"Container yeniden başlatılamadı: {e}", "error")
     return redirect(url_for('container_list'))
@@ -171,9 +425,16 @@ def restart_container(id):
 @app.route('/containers/remove/<id>', methods=['POST'])
 def remove_container(id):
     try:
-        container = client.containers.get(id)
-        container.remove(force=True)
-        flash(f"Container {container.name} silindi", "success")
+        if client:
+            container = client.containers.get(id)
+            container.remove(force=True)
+        elif cli_client and cli_client.available:
+            cli_client.container_remove(id, force=True)
+        else:
+            flash("Docker bağlantısı kurulamadı.", "error")
+            return redirect(url_for('container_list'))
+            
+        flash(f"Container silindi", "success")
     except Exception as e:
         flash(f"Container silinemedi: {e}", "error")
     return redirect(url_for('container_list'))
@@ -181,8 +442,16 @@ def remove_container(id):
 @app.route('/containers/logs/<id>')
 def container_logs(id):
     try:
-        container = client.containers.get(id)
-        logs = container.logs(tail=100).decode('utf-8')
+        if client:
+            container = client.containers.get(id)
+            logs = container.logs(tail=100).decode('utf-8')
+        elif cli_client and cli_client.available:
+            container = cli_client.get_container(id)
+            logs = cli_client.container_logs(id, tail=100)
+        else:
+            flash("Docker bağlantısı kurulamadı.", "error")
+            return redirect(url_for('container_list'))
+            
         return render_template('container_logs.html', container=container, logs=logs)
     except Exception as e:
         flash(f"Container logları alınamadı: {e}", "error")
@@ -191,7 +460,14 @@ def container_logs(id):
 @app.route('/images')
 def image_list():
     try:
-        images = client.images.list()
+        if client:
+            images = client.images.list()
+        elif cli_client and cli_client.available:
+            images = cli_client.images_list()
+        else:
+            images = []
+            flash("Docker bağlantısı kurulamadı.", "error")
+            
         return render_template('images.html', images=images)
     except Exception as e:
         flash(f"Image listesi alınamadı: {e}", "error")
@@ -200,7 +476,14 @@ def image_list():
 @app.route('/networks')
 def network_list():
     try:
-        networks = client.networks.list()
+        if client:
+            networks = client.networks.list()
+        elif cli_client and cli_client.available:
+            networks = cli_client.networks_list()
+        else:
+            networks = []
+            flash("Docker bağlantısı kurulamadı.", "error")
+            
         return render_template('networks.html', networks=networks)
     except Exception as e:
         flash(f"Network listesi alınamadı: {e}", "error")
@@ -209,7 +492,14 @@ def network_list():
 @app.route('/volumes')
 def volume_list():
     try:
-        volumes = client.volumes.list()
+        if client:
+            volumes = client.volumes.list()
+        elif cli_client and cli_client.available:
+            volumes = cli_client.volumes_list()
+        else:
+            volumes = []
+            flash("Docker bağlantısı kurulamadı.", "error")
+            
         return render_template('volumes.html', volumes=volumes)
     except Exception as e:
         flash(f"Volume listesi alınamadı: {e}", "error")
@@ -218,22 +508,51 @@ def volume_list():
 @app.route('/api/stats')
 def api_stats():
     try:
-        containers = client.containers.list(all=True)
-        running_containers = [c for c in containers if c.status == 'running']
-        images = client.images.list()
-        volumes = client.volumes.list()
-        networks = client.networks.list()
-        
         stats = {
             'containers': {
-                'total': len(containers),
-                'running': len(running_containers),
-                'stopped': len(containers) - len(running_containers)
+                'total': 0,
+                'running': 0,
+                'stopped': 0
             },
-            'images': len(images),
-            'volumes': len(volumes),
-            'networks': len(networks)
+            'images': 0,
+            'volumes': 0,
+            'networks': 0
         }
+        
+        if client:
+            containers = client.containers.list(all=True)
+            running_containers = [c for c in containers if c.status == 'running']
+            images = client.images.list()
+            volumes = client.volumes.list()
+            networks = client.networks.list()
+            
+            stats = {
+                'containers': {
+                    'total': len(containers),
+                    'running': len(running_containers),
+                    'stopped': len(containers) - len(running_containers)
+                },
+                'images': len(images),
+                'volumes': len(volumes),
+                'networks': len(networks)
+            }
+        elif cli_client and cli_client.available:
+            containers = cli_client.containers_list(all=True)
+            running_containers = [c for c in containers if 'Up' in c.status]
+            images = cli_client.images_list()
+            volumes = cli_client.volumes_list()
+            networks = cli_client.networks_list()
+            
+            stats = {
+                'containers': {
+                    'total': len(containers),
+                    'running': len(running_containers),
+                    'stopped': len(containers) - len(running_containers)
+                },
+                'images': len(images),
+                'volumes': len(volumes),
+                'networks': len(networks)
+            }
         
         return jsonify(stats)
     except Exception as e:
@@ -243,21 +562,24 @@ def api_stats():
 def api_status():
     """Docker bağlantı durumunu kontrol et"""
     try:
-        global client
-        
-        # Eğer client None ise yeniden bağlanmayı dene
-        if client is None:
-            connect_to_docker(max_attempts=1)
-        
         if client:
             version = client.version()
             return jsonify({
                 'status': 'connected',
+                'client': 'api',
                 'version': version.get('Version', 'bilinmiyor'),
                 'api_version': version.get('ApiVersion', 'bilinmiyor')
             })
+        elif cli_client and cli_client.available:
+            version = cli_client.version()
+            return jsonify({
+                'status': 'connected',
+                'client': 'cli',
+                'version': version.get('Server', {}).get('Version', 'bilinmiyor'),
+                'api_version': version.get('Server', {}).get('ApiVersion', 'bilinmiyor')
+            })
         else:
-            return jsonify({'status': 'disconnected', 'error': 'Docker client bağlantısı kurulamadı'})
+            return jsonify({'status': 'disconnected', 'error': 'Docker bağlantısı kurulamadı'})
     except Exception as e:
         return jsonify({'status': 'error', 'error': str(e)}), 500
 
