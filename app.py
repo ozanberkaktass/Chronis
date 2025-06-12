@@ -22,6 +22,18 @@ def index():
 
 @app.route('/dashboard')
 def dashboard():
+    # Varsayılan boş stats nesnesi oluştur
+    stats = {
+        'containers': {
+            'total': 0,
+            'running': 0,
+            'stopped': 0
+        },
+        'images': 0,
+        'volumes': 0,
+        'networks': 0
+    }
+    
     try:
         # Docker istatistikleri
         containers = client.containers.list(all=True)
@@ -44,7 +56,7 @@ def dashboard():
         return render_template('dashboard.html', stats=stats)
     except Exception as e:
         flash(f"Docker bilgileri alınamadı: {e}", "error")
-        return render_template('dashboard.html', error=str(e))
+        return render_template('dashboard.html', stats=stats, error=str(e))
 
 @app.route('/containers')
 def container_list():
