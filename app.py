@@ -4,7 +4,10 @@ import os
 import json
 from datetime import datetime
 
-app = Flask(__name__)
+# Flask uygulamasını başlat ve şablon klasörünü doğru şekilde ayarla
+template_dir = os.path.abspath('app/templates')
+static_dir = os.path.abspath('app/static')
+app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
 app.secret_key = "chronis_gizli_anahtar"  # Gerçek uygulamada değiştirin
 
 # Docker istemcisini başlat
