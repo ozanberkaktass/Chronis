@@ -53,14 +53,53 @@ class DockerCLIClient:
             for line in output.strip().split('\n'):
                 if line:
                     container_data = json.loads(line)
+                    
+                    # IP adresi için network bilgisini al
+                    ip_address = "-"
+                    if container_data.get('ID'):
+                        try:
+                            inspect_cmd = ['docker', 'inspect', container_data.get('ID')]
+                            inspect_output = subprocess.check_output(inspect_cmd, universal_newlines=True)
+                            inspect_data = json.loads(inspect_output)[0]
+                            networks = inspect_data.get('NetworkSettings', {}).get('Networks', {})
+                            if networks:
+                                for net_name, net_data in networks.items():
+                                    ip_address = net_data.get('IPAddress', '-')
+                                    if ip_address and ip_address != '-':
+                                        break
+                        except:
+                            pass
+                    
+                    # Status değerini running/exited formatına dönüştür
+                    status = container_data.get('Status', '').lower()
+                    if 'up' in status:
+                        status_normalized = 'running'
+                    elif 'exited' in status:
+                        status_normalized = 'exited'
+                    else:
+                        status_normalized = status
+                    
+                    # Şablonlarla uyumlu container nesnesi oluştur
                     container = type('obj', (object,), {
                         'id': container_data.get('ID', ''),
                         'name': container_data.get('Names', ''),
-                        'image': container_data.get('Image', ''),
-                        'status': container_data.get('Status', ''),
+                        'image': type('obj', (object,), {
+                            'tags': [container_data.get('Image', '')]
+                        }),
+                        'status': status_normalized,
                         'command': container_data.get('Command', ''),
                         'created': container_data.get('CreatedAt', ''),
-                        'ports': container_data.get('Ports', '')
+                        'ports': container_data.get('Ports', ''),
+                        'attrs': {
+                            'Created': container_data.get('CreatedAt', ''),
+                            'NetworkSettings': {
+                                'Networks': {
+                                    'default': {
+                                        'IPAddress': ip_address
+                                    }
+                                }
+                            }
+                        }
                     })
                     containers.append(container)
             
@@ -79,11 +118,31 @@ class DockerCLIClient:
             for line in output.strip().split('\n'):
                 if line:
                     image_data = json.loads(line)
+                    
+                    # Size değerini byte cinsinden al
+                    size_str = image_data.get('Size', '0')
+                    size_bytes = 0
+                    if 'MB' in size_str:
+                        size_bytes = float(size_str.replace('MB', '').strip()) * 1000000
+                    elif 'GB' in size_str:
+                        size_bytes = float(size_str.replace('GB', '').strip()) * 1000000000
+                    elif 'kB' in size_str:
+                        size_bytes = float(size_str.replace('kB', '').strip()) * 1000
+                    
+                    tag = image_data.get('Repository', '') + ':' + image_data.get('Tag', '')
+                    if tag == ':':
+                        tag = '<none>:<none>'
+                    
+                    # Şablonlarla uyumlu image nesnesi oluştur
                     image = type('obj', (object,), {
                         'id': image_data.get('ID', ''),
-                        'tags': [image_data.get('Repository', '') + ':' + image_data.get('Tag', '')],
+                        'short_id': image_data.get('ID', '')[:12],
+                        'tags': [tag] if tag != '<none>:<none>' else [],
                         'created': image_data.get('CreatedAt', ''),
-                        'size': image_data.get('Size', '')
+                        'attrs': {
+                            'Size': size_bytes,
+                            'Created': image_data.get('CreatedAt', '')
+                        }
                     })
                     images.append(image)
             
@@ -102,11 +161,18 @@ class DockerCLIClient:
             for line in output.strip().split('\n'):
                 if line:
                     network_data = json.loads(line)
+                    
+                    # Şablonlarla uyumlu network nesnesi oluştur
                     network = type('obj', (object,), {
                         'id': network_data.get('ID', ''),
                         'name': network_data.get('Name', ''),
                         'driver': network_data.get('Driver', ''),
-                        'scope': network_data.get('Scope', '')
+                        'scope': network_data.get('Scope', ''),
+                        'attrs': {
+                            'Name': network_data.get('Name', ''),
+                            'Driver': network_data.get('Driver', ''),
+                            'Scope': network_data.get('Scope', '')
+                        }
                     })
                     networks.append(network)
             
@@ -125,10 +191,26 @@ class DockerCLIClient:
             for line in output.strip().split('\n'):
                 if line:
                     volume_data = json.loads(line)
+                    
+                    # Volume için ek bilgi alma
+                    inspect_cmd = ['docker', 'volume', 'inspect', volume_data.get('Name', '')]
+                    try:
+                        inspect_output = subprocess.check_output(inspect_cmd, universal_newlines=True)
+                        inspect_data = json.loads(inspect_output)[0]
+                        mountpoint = inspect_data.get('Mountpoint', '')
+                    except:
+                        mountpoint = ''
+                    
+                    # Şablonlarla uyumlu volume nesnesi oluştur
                     volume = type('obj', (object,), {
                         'name': volume_data.get('Name', ''),
                         'driver': volume_data.get('Driver', ''),
-                        'mountpoint': ''  # CLI ile mountpoint bilgisi alınamıyor
+                        'mountpoint': mountpoint,
+                        'attrs': {
+                            'Name': volume_data.get('Name', ''),
+                            'Driver': volume_data.get('Driver', ''),
+                            'Mountpoint': mountpoint
+                        }
                     })
                     volumes.append(volume)
             
