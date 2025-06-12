@@ -13,7 +13,11 @@ import termios
 import signal
 import uuid
 import threading
+import eventlet
 from functools import wraps
+
+# WebSocket için eventlet'i kullan
+eventlet.monkey_patch()
 
 # Flask uygulamasını başlat ve şablon klasörünü doğru şekilde ayarla
 from flask import Flask, render_template, redirect, url_for, flash, request, jsonify, session
@@ -27,7 +31,7 @@ app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
 app.secret_key = "chronis_gizli_anahtar"  # Gerçek uygulamada değiştirin
 
 # Socket.IO
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet', ping_timeout=60)
 
 # Global değişken olarak Docker istemcisini tanımla
 client = None

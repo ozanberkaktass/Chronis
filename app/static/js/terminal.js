@@ -223,7 +223,15 @@ document.addEventListener('DOMContentLoaded', function() {
         term.writeln('Bağlanıyor...');
         
         // Socket.io bağlantısı
-        socket = io.connect('/terminal');
+        socket = io.connect('/terminal', {
+            transports: ['websocket', 'polling'], 
+            upgrade: true,
+            rememberUpgrade: true,
+            forceNew: true,
+            reconnection: true,
+            reconnectionAttempts: 5,
+            reconnectionDelay: 1000
+        });
         
         // Bağlantı kurulduğunda
         socket.on('connect', () => {
