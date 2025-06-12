@@ -658,8 +658,7 @@ def legacy_terminal_resize(data):
 # Terminal sayfası
 @app.route('/terminal')
 def terminal():
-    """Terminal sayfasını görüntüle"""
-    return render_template('terminal.html', title='Terminal')
+    return render_template('terminal.html', version="Chronis v1.3")
 
 # Çalışan containerları getir (terminal için)
 @app.route('/api/containers')
@@ -745,7 +744,7 @@ def delete_terminal_recording(recording_id):
 # Terminal2 sayfası
 @app.route('/terminal2')
 def terminal2():
-    return render_template('terminal2.html')
+    return render_template('terminal2.html', version="Chronis v1.3")
 
 # Ana fonksiyonlar
 @app.route('/')

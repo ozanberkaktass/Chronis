@@ -21,11 +21,11 @@
     .terminal-card {
         width: 100%;
         max-width: 900px;
-        background: #23272e;
-        border-radius: 16px;
-        box-shadow: 0 8px 32px 0 rgba(0,0,0,0.25);
+        background: #1a1d21;
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
         overflow: hidden;
-        border: 1.5px solid #23272e;
+        border: 1px solid #2a2e32;
         margin-bottom: 32px;
         display: flex;
         flex-direction: column;
@@ -33,18 +33,38 @@
     .terminal-card-header {
         display: flex;
         align-items: center;
-        background: linear-gradient(90deg, #23272e 80%, #31343e 100%);
+        background: linear-gradient(90deg, #1a1d21 0%, #23272e 100%);
         padding: 1rem 1.5rem;
-        border-bottom: 1px solid #292d36;
+        border-bottom: 1px solid #2a2e32;
+        position: relative;
+    }
+    .terminal-card-header .window-controls {
+        display: flex;
+        gap: 8px;
+        margin-right: 16px;
+    }
+    .terminal-card-header .window-control {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+    }
+    .terminal-card-header .window-control.close {
+        background-color: #ff5f56;
+    }
+    .terminal-card-header .window-control.minimize {
+        background-color: #ffbd2e;
+    }
+    .terminal-card-header .window-control.maximize {
+        background-color: #27c93f;
     }
     .terminal-card-header .icon {
-        font-size: 1.6rem;
+        font-size: 1.4rem;
         color: #7ee787;
         margin-right: 0.9rem;
     }
     .terminal-card-header .title {
-        font-size: 1.25rem;
-        font-weight: 700;
+        font-size: 1.15rem;
+        font-weight: 600;
         letter-spacing: 0.5px;
         color: #f0f0f0;
     }
@@ -52,20 +72,31 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 1.2rem 1.5rem 0.5rem 1.5rem;
+        padding: 0.8rem 1.5rem;
+        background: #23272e;
+        border-bottom: 1px solid #2a2e32;
     }
     .status-indicator {
         width: 10px;
         height: 10px;
         border-radius: 50%;
         display: inline-block;
-        margin-right: 5px;
+        margin-right: 8px;
+        box-shadow: 0 0 5px rgba(0,0,0,0.3);
     }
     .status-connected {
-        background-color: #00ff00;
+        background-color: #27c93f;
+        box-shadow: 0 0 8px rgba(39, 201, 63, 0.5);
     }
     .status-disconnected {
-        background-color: #ff0000;
+        background-color: #ff5f56;
+        box-shadow: 0 0 8px rgba(255, 95, 86, 0.5);
+    }
+    .connection-status {
+        display: flex;
+        align-items: center;
+        font-size: 0.9rem;
+        color: #94a3b8;
     }
     .terminal-actions {
         display: flex;
@@ -74,11 +105,28 @@
     .btn {
         border-radius: 6px;
         font-weight: 500;
-        font-size: 15px;
-        padding: 7px 18px;
+        font-size: 14px;
+        padding: 6px 16px;
+        transition: all 0.2s ease;
+    }
+    .btn-primary {
+        background: #4f46e5;
+        border-color: #4338ca;
+    }
+    .btn-primary:hover {
+        background: #4338ca;
+        border-color: #3730a3;
+    }
+    .btn-outline-secondary {
+        border-color: #475569;
+        color: #94a3b8;
+    }
+    .btn-outline-secondary:hover {
+        background: #334155;
+        color: #f0f0f0;
     }
     .terminal-card-body {
-        background: #181f2a;
+        background: #0f1419;
         padding: 0;
         min-height: 400px;
         height: 480px;
@@ -92,8 +140,8 @@
         height: 100%;
         min-height: 400px;
         background: transparent;
-        padding: 0;
-        border-radius: 0 0 16px 16px;
+        padding: 10px;
+        border-radius: 0 0 12px 12px;
         overflow: hidden;
         position: relative;
     }
@@ -102,7 +150,7 @@
         height: 100% !important;
         min-height: 100% !important;
         background: transparent !important;
-        font-size: 1.05rem;
+        font-size: 1rem;
     }
     @media (max-width: 1000px) {
         .terminal-card {
@@ -125,6 +173,11 @@
 <div class="terminal-page-wrapper">
     <div class="terminal-card">
         <div class="terminal-card-header">
+            <div class="window-controls">
+                <div class="window-control close"></div>
+                <div class="window-control minimize"></div>
+                <div class="window-control maximize"></div>
+            </div>
             <span class="icon"><i class="fas fa-terminal"></i></span>
             <span class="title">Terminal</span>
         </div>
