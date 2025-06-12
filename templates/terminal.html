@@ -5,21 +5,34 @@
 {% block styles %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/xterm.css') }}">
 <style>
+    body {
+        background: #181f2a;
+        color: #f0f0f0;
+    }
     #terminal-container {
         width: 100%;
-        height: calc(100vh - 180px);
+        height: 500px;
         min-height: 400px;
-        background-color: #1e1e1e;
-        padding: 10px;
-        border-radius: 5px;
+        background-color: #23272e;
+        padding: 0;
+        border-radius: 10px;
+        box-shadow: 0 2px 16px 0 rgba(0,0,0,0.15);
+        display: flex;
+        align-items: flex-end;
+        overflow: hidden;
+        margin-bottom: 0;
     }
-    
+    .container-fluid {
+        max-width: 1400px;
+        margin: 0 auto;
+    }
     .terminal-toolbar {
         display: flex;
         justify-content: space-between;
+        align-items: center;
         margin-bottom: 10px;
+        margin-top: 10px;
     }
-    
     .status-indicator {
         width: 10px;
         height: 10px;
@@ -27,18 +40,34 @@
         display: inline-block;
         margin-right: 5px;
     }
-    
     .status-connected {
         background-color: #00ff00;
     }
-    
     .status-disconnected {
         background-color: #ff0000;
     }
-    
     .terminal-actions {
         display: flex;
         gap: 10px;
+    }
+    .btn {
+        border-radius: 6px;
+        font-weight: 500;
+        font-size: 15px;
+        padding: 7px 18px;
+    }
+    h1 {
+        font-size: 2.2rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+    @media (max-width: 900px) {
+        #terminal-container {
+            height: 350px;
+        }
+        .container-fluid {
+            padding: 0 10px;
+        }
     }
 </style>
 {% endblock %}
