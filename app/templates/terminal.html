@@ -3,7 +3,7 @@
 {% block title %}Terminal{% endblock %}
 
 {% block styles %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/xterm.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/xterm.css') }}">
 <style>
     #terminal-container {
         width: 100%;
@@ -135,8 +135,8 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/xterm.js') }}"></script>
-<script src="{{ url_for('static', filename='js/xterm-addon-fit.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/xterm.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/xterm-addon-fit.js') }}"></script>
 <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
 <script src="{{ url_for('static', filename='js/terminal.js') }}"></script>
 {% endblock %} 
