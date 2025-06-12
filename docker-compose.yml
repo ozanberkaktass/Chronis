@@ -4,6 +4,7 @@ services:
   chronis:
     build: .
     container_name: chronis
+    privileged: true
     ports:
       - "5000:5000"
     volumes:
@@ -12,4 +13,5 @@ services:
     restart: unless-stopped
     environment:
       - FLASK_APP=app.py
-      - FLASK_ENV=production 
+      - FLASK_ENV=production
+      - DOCKER_HOST=unix:///var/run/docker.sock 

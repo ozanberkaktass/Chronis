@@ -15,12 +15,23 @@ client = None
 
 # Docker istemcisini başlat
 try:
-    # Docker API ile bağlantı kur - başka bir yöntem deneyelim
-    import docker.utils
-    client = docker.from_env()
+    # Docker socket yolu
+    socket_path = '/var/run/docker.sock'
+    
+    # Docker istemcisini oluştur
+    # Eğer DOCKER_HOST çevre değişkeni tanımlıysa, onu kullan
+    if os.environ.get('DOCKER_HOST'):
+        client = docker.from_env()
+        print(f"DOCKER_HOST çevre değişkeniyle bağlanma deneniyor: {os.environ.get('DOCKER_HOST')}")
+    else:
+        # Doğrudan socket yolunu belirt
+        client = docker.DockerClient(base_url=f"unix://{socket_path}")
+        print(f"Unix socket ile bağlanma deneniyor: {socket_path}")
+    
     # Bağlantıyı test et
-    client.ping()
-    print("Docker bağlantısı başarılı")
+    version = client.version()
+    print(f"Docker bağlantısı başarılı. Docker versiyonu: {version.get('Version', 'bilinmiyor')}")
+    
 except Exception as e:
     print(f"Docker bağlantısı kurulamadı: {e}")
     client = None
