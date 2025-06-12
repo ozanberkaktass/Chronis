@@ -1,0 +1,15 @@
+version: '3'
+
+services:
+  chronis:
+    build: .
+    container_name: chronis
+    ports:
+      - "5000:5000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./app:/app/app
+    restart: unless-stopped
+    environment:
+      - FLASK_APP=app.py
+      - FLASK_ENV=production 
