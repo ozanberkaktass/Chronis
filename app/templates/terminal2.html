@@ -1,0 +1,150 @@
+{% extends "layout.html" %}
+
+{% block title %}Terminal{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/xterm.css') }}">
+<style>
+    #terminal-container {
+        width: 100%;
+        height: calc(100vh - 180px);
+        min-height: 400px;
+        background-color: #1e1e1e;
+        padding: 10px;
+        border-radius: 5px;
+    }
+    
+    .terminal-toolbar {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px;
+    }
+    
+    .status-indicator {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 5px;
+    }
+    
+    .status-connected {
+        background-color: #00ff00;
+    }
+    
+    .status-disconnected {
+        background-color: #ff0000;
+    }
+    
+    .terminal-actions {
+        display: flex;
+        gap: 10px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h1>Terminal</h1>
+            <p>Container ve host'lara web tabanlı terminal erişimi</p>
+        </div>
+    </div>
+    
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="terminal-toolbar">
+                <div class="connection-status">
+                    <span class="status-indicator status-disconnected" id="status-indicator"></span>
+                    <span id="connection-label">Bağlı değil</span>
+                </div>
+                <div class="terminal-actions">
+                    <button class="btn btn-primary" id="btn-new-session">
+                        <i class="fas fa-plus"></i> Yeni Oturum
+                    </button>
+                    <button class="btn btn-outline-secondary" id="btn-sessions">
+                        <i class="fas fa-list"></i> Oturumlar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-12">
+            <div id="terminal-container"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Yeni Oturum Modal -->
+<div class="modal fade" id="newSessionModal" tabindex="-1" aria-labelledby="newSessionModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="newSessionModalLabel">Yeni Terminal Oturumu</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="session-type" class="form-label">Oturum Tipi</label>
+                    <select class="form-select" id="session-type">
+                        <option value="ssh">SSH</option>
+                        <option value="container">Konteyner</option>
+                        <option value="host">Yerel Host</option>
+                    </select>
+                </div>
+                
+                <!-- SSH için alanlar -->
+                <div id="ssh-fields">
+                    <div class="mb-3">
+                        <label for="ssh-host" class="form-label">Sunucu Adresi</label>
+                        <input type="text" class="form-control" id="ssh-host" placeholder="örn: 192.168.1.100">
+                    </div>
+                    <div class="mb-3">
+                        <label for="ssh-port" class="form-label">Port</label>
+                        <input type="number" class="form-control" id="ssh-port" value="22">
+                    </div>
+                    <div class="mb-3">
+                        <label for="ssh-username" class="form-label">Kullanıcı Adı</label>
+                        <input type="text" class="form-control" id="ssh-username">
+                    </div>
+                    <div class="mb-3">
+                        <label for="ssh-password" class="form-label">Şifre</label>
+                        <input type="password" class="form-control" id="ssh-password">
+                    </div>
+                </div>
+                
+                <!-- Konteyner için alanlar -->
+                <div id="container-fields" style="display:none;">
+                    <div class="mb-3">
+                        <label for="container-id" class="form-label">Konteyner</label>
+                        <select class="form-select" id="container-id">
+                            <option value="">Yükleniyor...</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Host için alanlar -->
+                <div id="host-fields" style="display:none;">
+                    <div class="alert alert-info">
+                        Yerel host terminaline bağlanılacak.
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                <button type="button" class="btn btn-primary" id="btn-connect">Bağlan</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/xterm.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/xterm-addon-fit.js') }}"></script>
+<script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+<script src="{{ url_for('static', filename='js/terminal2.js') }}"></script>
+{% endblock %} 

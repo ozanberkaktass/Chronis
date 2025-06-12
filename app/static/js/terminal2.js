@@ -1,10 +1,11 @@
 /**
  * Chronis - Terminal2 İşlevselliği
  * WebSocket tabanlı terminal iletişimi ve kayıt/oynatma işlemleri
+ * Versiyon: 1.3
  */
 
 // Terminal yöneticisi
-class Terminal2Manager {
+class TerminalManager {
     constructor() {
         // Terminal özellikleri
         this.term = null;
@@ -21,12 +22,7 @@ class Terminal2Manager {
         // DOM elemanlarını al
         this.statusIndicator = document.getElementById('status-indicator');
         this.connectionLabel = document.getElementById('connection-label');
-        const terminalContainer = document.getElementById('terminal-container2');
-        
-        if (!terminalContainer) {
-            console.error('Terminal container bulunamadı!');
-            return;
-        }
+        const terminalContainer = document.getElementById('terminal-container');
         
         // Terminal'i oluştur
         this.term = new Terminal({
@@ -70,13 +66,13 @@ class Terminal2Manager {
         this.bindEvents();
         
         // Sayfa yüklendiğinde hoş geldin mesajı
-        this.term.writeln('Chronis Terminal 2 Uygulamasına Hoş Geldiniz!');
+        this.term.writeln('Chronis Terminal2 Uygulamasına Hoş Geldiniz!');
         this.term.writeln('Bir terminal oturumu başlatmak için "Yeni Oturum" butonuna tıklayın.');
         
         this.resizeTerminal();
         this.setupUIListeners();
         
-        this.log('Terminal2 yöneticisi başlatıldı');
+        this.log('Terminal yöneticisi başlatıldı');
     }
     
     // Terminal boyutunu ayarla
@@ -122,18 +118,16 @@ class Terminal2Manager {
         document.getElementById('btn-connect').addEventListener('click', () => this.connectToSession());
         
         // Session tipi değiştiğinde
-        const sessionTypeSelect = document.getElementById('session-type');
-        if (sessionTypeSelect) {
-            sessionTypeSelect.addEventListener('change', (e) => {
-                const type = e.target.value;
-                document.getElementById('ssh-fields').style.display = (type === 'ssh') ? 'block' : 'none';
-                document.getElementById('container-fields').style.display = (type === 'container') ? 'block' : 'none';
-                
-                if (type === 'container') {
-                    this.fetchContainers();
-                }
-            });
-        }
+        document.getElementById('session-type').addEventListener('change', (e) => {
+            const type = e.target.value;
+            document.getElementById('ssh-fields').style.display = (type === 'ssh') ? 'block' : 'none';
+            document.getElementById('container-fields').style.display = (type === 'container') ? 'block' : 'none';
+            document.getElementById('host-fields').style.display = (type === 'host') ? 'block' : 'none';
+            
+            if (type === 'container') {
+                this.fetchContainers();
+            }
+        });
     }
     
     // Socket.io olay işleyicileri
@@ -241,6 +235,11 @@ class Terminal2Manager {
                 type: 'container',
                 target: containerId
             });
+        } else if (sessionType === 'host') {
+            this.log('Yerel host bağlantısı başlatılıyor');
+            this.socket.emit('create_session', {
+                type: 'host'
+            });
         }
         
         // Bağlantı kurulurken mesaj göster
@@ -258,10 +257,12 @@ class Terminal2Manager {
                 
                 if (data.containers && data.containers.length > 0) {
                     data.containers.forEach(container => {
-                        const option = document.createElement('option');
-                        option.value = container.id;
-                        option.textContent = `${container.name} (${container.id.substring(0, 12)})`;
-                        containerSelect.appendChild(option);
+                        if (container.status === 'running') {
+                            const option = document.createElement('option');
+                            option.value = container.id;
+                            option.textContent = `${container.name} (${container.id.substring(0, 12)})`;
+                            containerSelect.appendChild(option);
+                        }
                     });
                 } else {
                     const option = document.createElement('option');
@@ -271,9 +272,9 @@ class Terminal2Manager {
                 }
             })
             .catch(error => {
-                console.error('Konteyner listesi alınamadı:', error);
+                this.logError('Konteyner listesi alınamadı:', error);
                 const containerSelect = document.getElementById('container-id');
-                containerSelect.innerHTML = '<option value="">Hata: Konteynerler alınamadı</option>';
+                containerSelect.innerHTML = '<option value="">Hata: Konteynerler yüklenemedi</option>';
             });
     }
     
@@ -285,12 +286,12 @@ class Terminal2Manager {
     }
     
     logError(...args) {
-        console.error('[Terminal2 Error]', ...args);
+        console.error('[Terminal2]', ...args);
     }
 }
 
-// Sayfa yüklendiğinde Terminal2 yöneticisini başlat
-document.addEventListener('DOMContentLoaded', function() {
-    const terminal2 = new Terminal2Manager();
-    terminal2.init();
+// Sayfa yüklendiğinde terminal yöneticisini başlat
+document.addEventListener('DOMContentLoaded', () => {
+    const terminalManager = new TerminalManager();
+    terminalManager.init();
 }); 

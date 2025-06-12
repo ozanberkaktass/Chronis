@@ -6,14 +6,21 @@ import re
 import random
 import datetime
 import time
-import pty
-import fcntl
-import struct
-import termios
 import signal
 import uuid
 import threading
 import eventlet
+import platform
+
+# Windows kontrolü
+IS_WINDOWS = platform.system() == 'Windows'
+
+# Linux'a özgü modülleri sadece Linux'ta içe aktar
+if not IS_WINDOWS:
+    import pty
+    import fcntl
+    import struct
+    import termios
 from functools import wraps
 import traceback
 import paramiko
@@ -88,6 +95,10 @@ connect_to_docker()
 # Terminal işlemleri
 def create_terminal(fd, pid):
     """Terminal verilerini işle ve sockete gönder"""
+    if IS_WINDOWS:
+        logger.warning("Windows'ta terminal işlevleri kısıtlıdır")
+        return None
+    
     def read_and_forward_terminal_output():
         max_read_bytes = 1024 * 20
         while True:
@@ -114,15 +125,20 @@ def create_terminal(fd, pid):
 
 def get_terminal_size(fd):
     """Terminal boyutunu al"""
-    size = struct.pack('HHHH', 0, 0, 0, 0)
-    size = fcntl.ioctl(fd, termios.TIOCGWINSZ, size)
-    rows, cols, _, _ = struct.unpack('HHHH', size)
-    return rows, cols
+    if IS_WINDOWS:
+        # Windows için varsayılan değerler
+        return 24, 80
+    else:
+        size = struct.pack('HHHH', 0, 0, 0, 0)
+        size = fcntl.ioctl(fd, termios.TIOCGWINSZ, size)
+        rows, cols, _, _ = struct.unpack('HHHH', size)
+        return rows, cols
 
 def set_terminal_size(fd, rows, cols):
     """Terminal boyutunu ayarla"""
-    size = struct.pack('HHHH', rows, cols, 0, 0)
-    fcntl.ioctl(fd, termios.TIOCSWINSZ, size)
+    if not IS_WINDOWS:
+        size = struct.pack('HHHH', rows, cols, 0, 0)
+        fcntl.ioctl(fd, termios.TIOCSWINSZ, size)
 
 # Socket.IO terminal olayları
 @socketio.on('connect', namespace='/terminal')
@@ -219,9 +235,10 @@ def create_terminal_session(data):
                 return
         
         elif session_type == 'host':
-            # Yerel sistem için PTY oluştur
+            # Yerel sistem için terminal oluştur
             try:
-                if os.name == 'posix':
+                if not IS_WINDOWS:
+                    # Linux için PTY kullan
                     shell = os.environ.get('SHELL', '/bin/bash')
                     fd, child_fd = pty.openpty()
                     pid = os.fork()
@@ -241,11 +258,13 @@ def create_terminal_session(data):
                         os.close(child_fd)
                         fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 80, 0, 0))
                 else:
-                    # Windows için terminal başlatma - subprocess kullanabilir
-                    pass
+                    # Windows için uyarı mesajı
+                    emit('connection_error', {'error': 'Windows\'ta yerel terminal desteği sınırlıdır. Docker container terminali kullanabilirsiniz.'})
+                    logger.warning("Windows'ta yerel terminal desteği sınırlıdır")
+                    return
             except Exception as e:
-                emit('connection_error', {'error': f'PTY oluşturma hatası: {str(e)}'})
-                print(f"PTY hatası: {str(e)}")
+                emit('connection_error', {'error': f'Terminal oluşturma hatası: {str(e)}'})
+                logger.error(f"Terminal hatası: {str(e)}")
                 return
         
         elif session_type == 'ssh':
