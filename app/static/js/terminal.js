@@ -43,6 +43,13 @@ class TerminalManager {
         this.term.open(terminalContainer);
         this.fitAddon.fit();
         
+        // xterm div'inin yüksekliğini ve genişliğini %100 yap
+        const xtermDiv = terminalContainer.querySelector('.xterm');
+        if (xtermDiv) {
+            xtermDiv.style.height = '100%';
+            xtermDiv.style.width = '100%';
+        }
+        
         // Socket.io bağlantısı
         this.socket = io('/terminal', {
             path: '/socket.io',
