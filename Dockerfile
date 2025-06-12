@@ -2,38 +2,27 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
-
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Unix socket işlemi için gerekli paketleri yükle
-RUN apt-get update && \
-    apt-get install -y \
-    apt-transport-https \
-    ca-certificates \
+# Docker bağımlılıklarını ve Python bağımlılıklarını kur
+RUN apt-get update && apt-get install -y \
     curl \
     gnupg \
     lsb-release \
-    libffi-dev \
-    libssl-dev \
-    python3-dev \
-    socat \
-    procps \
-    iproute2
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Docker CLI kurulumu
-RUN curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add - && \
-    echo "deb [arch=amd64] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null && \
-    apt-get update && \
-    apt-get install -y docker-ce-cli && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+RUN curl -fsSL https://get.docker.com -o get-docker.sh && \
+    sh get-docker.sh && \
+    rm get-docker.sh
 
+# Python bağımlılıklarını kopyala ve kur
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Uygulama dosyalarını kopyala
 COPY . .
 
-# Docker socket hacim noktasını hazırla - socket dosyasını önceden oluşturmuyoruz
-RUN mkdir -p /docker-socket
-
+# Port 5000'i dışarı aç
 EXPOSE 5000
 
 # Uygulamayı başlat
