@@ -223,10 +223,12 @@ class DockerCLIClient:
             print(f"Network listesi alınamadı: {e}")
             return []
     
-    def volumes_list(self):
+    def volumes_list(self, all=False):
         """Volume listesini al"""
         try:
             cmd = ['docker', 'volume', 'ls', '--format', '{{json .}}']
+            if all:
+                cmd.append('-a')
             output = subprocess.check_output(cmd, universal_newlines=True)
             volumes = []
             
@@ -396,19 +398,43 @@ def connect_to_docker(max_attempts=3, delay=1):
     
     for attempt in range(max_attempts):
         try:
-            # Docker API istemcisini başlat
-            docker_client = docker.from_env()
-            
-            # Bağlantıyı test et
-            version = docker_client.version()
-            print(f"Docker'a bağlandı: {version.get('Version', 'bilinmiyor')}")
-            return True
+            # Docker API istemcisini başlat - farklı bağlantı yöntemlerini dene
+            try:
+                # Önce varsayılan yöntemi dene
+                docker_client = docker.from_env()
+                # Bağlantıyı test et
+                version = docker_client.version()
+                print(f"Docker'a bağlandı: {version.get('Version', 'bilinmiyor')}")
+                return True
+            except:
+                # Unix soket yöntemi dene (Linux)
+                try:
+                    docker_client = docker.DockerClient(base_url='unix:///var/run/docker.sock')
+                    version = docker_client.version()
+                    print(f"Docker'a Unix soket ile bağlandı: {version.get('Version', 'bilinmiyor')}")
+                    return True
+                except:
+                    # Windows named pipe dene
+                    try:
+                        docker_client = docker.DockerClient(base_url='npipe:////./pipe/docker_engine')
+                        version = docker_client.version()
+                        print(f"Docker'a Windows pipe ile bağlandı: {version.get('Version', 'bilinmiyor')}")
+                        return True
+                    except:
+                        # TCP ile dene
+                        docker_client = docker.DockerClient(base_url='tcp://localhost:2375')
+                        version = docker_client.version()
+                        print(f"Docker'a TCP ile bağlandı: {version.get('Version', 'bilinmiyor')}")
+                        return True
+                
         except Exception as e:
             print(f"Docker bağlantı hatası (deneme {attempt+1}/{max_attempts}): {str(e)}")
             if attempt < max_attempts - 1:
                 time.sleep(delay)
     
     print("Docker'a bağlanılamadı, uygulama sınırlı işlevsellikle çalışacak.")
+    # Docker client değişkenini None olarak ayarla
+    docker_client = None
     return False
 
 # Uygulama başlangıcında Docker'a bağlan
@@ -938,8 +964,8 @@ def terminal():
     return render_template('terminal.html', title='Terminal')
 
 # Çalışan containerları getir (terminal için)
-@app.route('/api/containers/running')
-def get_running_containers():
+@app.route('/api/containers')
+def get_containers_api():
     """Çalışan container listesini getir"""
     try:
         if docker_client:
@@ -954,8 +980,21 @@ def get_running_containers():
             
             return jsonify(container_list)
         else:
-            return jsonify([])
+            # Docker bağlantısı yoksa mock veri göster
+            print("Docker bağlantısı kurulamadı. Mock veri gösteriliyor.")
+            mock_containers = get_mock_containers()
+            container_list = []
+            
+            for container in mock_containers:
+                if container['status'] == 'running':
+                    container_list.append({
+                        'id': container['id'],
+                        'name': container['name']
+                    })
+            
+            return jsonify(container_list)
     except Exception as e:
+        print(f"Konteyner listesi alınırken hata: {str(e)}")
         return jsonify([])
 
 # Terminal oturumlarını getir
@@ -1057,13 +1096,15 @@ def container_list():
         if docker_client:
             containers = docker_client.containers.list(all=True)
         else:
-            containers = []
-            flash("Docker bağlantısı kurulamadı.", "error")
-            
-        return render_template('containers.html', containers=containers)
+            # Docker bağlantısı yoksa mock veri göster
+            print("Docker bağlantısı kurulamadı. Mock veri gösteriliyor.")
+            containers = get_mock_containers()
+            return render_template('containers.html', containers=containers, title='Konteynerler')
     except Exception as e:
-        flash(f"Container listesi alınamadı: {e}", "error")
-        return render_template('containers.html', error=str(e))
+        flash(f"Konteyner listesi alınırken hata: {str(e)}", "error")
+        containers = []
+    
+    return render_template('containers.html', containers=containers, title='Konteynerler')
 
 @app.route('/containers/<id>')
 def container_detail(id):
@@ -1155,93 +1196,70 @@ def container_logs(id):
         return redirect(url_for('container_detail', id=id))
 
 @app.route('/images')
-def image_list():
+def image_list_page():
     try:
         if docker_client:
             images = docker_client.images.list()
         else:
-            images = []
-            flash("Docker bağlantısı kurulamadı.", "error")
-            
-        return render_template('images.html', images=images)
+            # Docker bağlantısı yoksa mock veri göster
+            print("Docker bağlantısı kurulamadı. Mock veri gösteriliyor.")
+            images = get_mock_images()
+            return render_template('images.html', images=images, title='İmajlar')
     except Exception as e:
-        flash(f"Image listesi alınamadı: {e}", "error")
-        return render_template('images.html', error=str(e))
+        flash(f"İmaj listesi alınırken hata: {str(e)}", "error")
+        images = []
+    
+    return render_template('images.html', images=images, title='İmajlar')
 
 @app.route('/networks')
-def network_list():
+def network_list_page():
     try:
         if docker_client:
             networks = docker_client.networks.list()
         else:
-            networks = []
-            flash("Docker bağlantısı kurulamadı.", "error")
-            
-        return render_template('networks.html', networks=networks)
+            # Docker bağlantısı yoksa mock veri göster
+            print("Docker bağlantısı kurulamadı. Mock veri gösteriliyor.")
+            networks = get_mock_networks()
+            return render_template('networks.html', networks=networks, title='Ağlar')
     except Exception as e:
-        flash(f"Network listesi alınamadı: {e}", "error")
-        return render_template('networks.html', error=str(e))
+        flash(f"Ağ listesi alınırken hata: {str(e)}", "error")
+        networks = []
+    
+    return render_template('networks.html', networks=networks, title='Ağlar')
 
 @app.route('/volumes')
-def volume_list():
+def volume_list_page():
     try:
         if docker_client:
             volumes = docker_client.volumes.list()
         else:
-            volumes = []
-            flash("Docker bağlantısı kurulamadı.", "error")
-            
-        return render_template('volumes.html', volumes=volumes)
+            # Docker bağlantısı yoksa mock veri göster
+            print("Docker bağlantısı kurulamadı. Mock veri gösteriliyor.")
+            volumes = get_mock_volumes()
+            return render_template('volumes.html', volumes=volumes, title='Volumeler')
     except Exception as e:
-        flash(f"Volume listesi alınamadı: {e}", "error")
-        return render_template('volumes.html', error=str(e))
+        flash(f"Volume listesi alınırken hata: {str(e)}", "error")
+        volumes = []
+    
+    return render_template('volumes.html', volumes=volumes, title='Volumeler')
 
 @app.route('/api/stats')
-def api_stats():
+def get_stats():
+    """Docker istatistiklerini getir"""
+    stats = {
+        'containers': {
+            'total': 0,
+            'running': 0,
+            'stopped': 0
+        },
+        'images': 0,
+        'volumes': 0,
+        'networks': 0
+    }
+    
     try:
-        # Şu anki sunucu saati
-        now = datetime.datetime.now()
-        # Türkiye saati için 3 saat ekliyoruz
-        tr_now = now + datetime.timedelta(hours=3)
-        
-        stats = {
-            'containers': {
-                'total': 0,
-                'running': 0,
-                'stopped': 0
-            },
-            'images': 0,
-            'volumes': 0,
-            'networks': 0,
-            'system': {
-                'cpu_usage': random.randint(10, 60),
-                'memory_usage': random.randint(20, 70),
-                'disk_usage': random.randint(30, 80),
-                'time': tr_now.strftime('%H:%M:%S')
-            },
-            'events': [
-                {
-                    'time': tr_now.strftime('%H:%M:%S'),
-                    'event': 'Container başlatıldı',
-                    'source': 'chronis',
-                    'status': 'success'
-                },
-                {
-                    'time': (tr_now - datetime.timedelta(minutes=2)).strftime('%H:%M:%S'),
-                    'event': 'Image indirildi',
-                    'source': 'nginx:latest',
-                    'status': 'success'
-                },
-                {
-                    'time': (tr_now - datetime.timedelta(minutes=5)).strftime('%H:%M:%S'),
-                    'event': 'Container oluşturuldu',
-                    'source': 'chronis',
-                    'status': 'success'
-                }
-            ]
-        }
-        
         if docker_client:
+            # Docker API ile istatistikleri al
             containers = docker_client.containers.list(all=True)
             running_containers = [c for c in containers if c.status == 'running']
             images = docker_client.images.list()
@@ -1258,10 +1276,29 @@ def api_stats():
                 'volumes': len(volumes),
                 'networks': len(networks)
             })
-        
-        return jsonify(stats)
+        else:
+            # Docker bağlantısı yoksa mock veri göster
+            print("Docker bağlantısı kurulamadı. Mock veri gösteriliyor.")
+            mock_containers = get_mock_containers()
+            running_containers = [c for c in mock_containers if c['status'] == 'running']
+            mock_images = get_mock_images()
+            mock_volumes = get_mock_volumes()
+            mock_networks = get_mock_networks()
+            
+            stats.update({
+                'containers': {
+                    'total': len(mock_containers),
+                    'running': len(running_containers),
+                    'stopped': len(mock_containers) - len(running_containers)
+                },
+                'images': len(mock_images),
+                'volumes': len(mock_volumes),
+                'networks': len(mock_networks)
+            })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"İstatistikler alınırken hata: {str(e)}")
+    
+    return jsonify(stats)
 
 @app.route('/api/status')
 def api_status():
@@ -1294,6 +1331,105 @@ def format_date(value, format='%Y-%m-%d %H:%M'):
             except (ValueError, TypeError):
                 return value
     return value.strftime(format)
+
+# Mock veri fonksiyonları - Docker bağlantısı olmadığında kullanılır
+def get_mock_containers():
+    """Mock konteyner verileri"""
+    return [
+        {
+            'id': 'abc123456789',
+            'name': 'mock_nginx',
+            'image': 'nginx:latest',
+            'status': 'running',
+            'created': '2023-05-15T10:00:00Z',
+            'ports': '80/tcp, 443/tcp',
+            'command': 'nginx -g daemon off;'
+        },
+        {
+            'id': 'def789012345',
+            'name': 'mock_redis',
+            'image': 'redis:alpine',
+            'status': 'running',
+            'created': '2023-05-15T11:00:00Z',
+            'ports': '6379/tcp',
+            'command': 'redis-server'
+        },
+        {
+            'id': 'ghi456789012',
+            'name': 'mock_postgres',
+            'image': 'postgres:14',
+            'status': 'exited',
+            'created': '2023-05-14T09:00:00Z',
+            'ports': '5432/tcp',
+            'command': 'postgres'
+        }
+    ]
+
+def get_mock_images():
+    """Mock imaj verileri"""
+    return [
+        {
+            'id': 'sha256:a1b2c3d4e5f6',
+            'tags': ['nginx:latest'],
+            'created': '2023-04-10T08:00:00Z',
+            'size': '140MB'
+        },
+        {
+            'id': 'sha256:g7h8i9j0k1l2',
+            'tags': ['redis:alpine'],
+            'created': '2023-04-05T08:00:00Z',
+            'size': '32MB'
+        },
+        {
+            'id': 'sha256:m3n4o5p6q7r8',
+            'tags': ['postgres:14'],
+            'created': '2023-03-20T08:00:00Z',
+            'size': '374MB'
+        }
+    ]
+
+def get_mock_networks():
+    """Mock ağ verileri"""
+    return [
+        {
+            'id': 'net123456789',
+            'name': 'bridge',
+            'driver': 'bridge',
+            'scope': 'local',
+            'created': '2023-01-01T00:00:00Z'
+        },
+        {
+            'id': 'net234567890',
+            'name': 'host',
+            'driver': 'host',
+            'scope': 'local',
+            'created': '2023-01-01T00:00:00Z'
+        },
+        {
+            'id': 'net345678901',
+            'name': 'mock_network',
+            'driver': 'bridge',
+            'scope': 'local',
+            'created': '2023-05-01T10:00:00Z'
+        }
+    ]
+
+def get_mock_volumes():
+    """Mock volume verileri"""
+    return [
+        {
+            'name': 'mock_data',
+            'driver': 'local',
+            'mountpoint': '/var/lib/docker/volumes/mock_data/_data',
+            'created': '2023-05-01T10:00:00Z'
+        },
+        {
+            'name': 'mock_postgres_data',
+            'driver': 'local',
+            'mountpoint': '/var/lib/docker/volumes/mock_postgres_data/_data',
+            'created': '2023-04-15T09:00:00Z'
+        }
+    ]
 
 # Ana döngü
 if __name__ == '__main__':
