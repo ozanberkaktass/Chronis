@@ -3,17 +3,17 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-        <h1 class="h3">Network Listesi</h1>
-        <p class="text-muted">Tüm Docker ağlarınızı görüntüleyin ve yönetin</p>
+        <h1 class="h3" data-i18n="networks">Network Listesi</h1>
+        <p class="text-muted" data-i18n="networks_desc">Tüm Docker ağlarınızı görüntüleyin ve yönetin</p>
     </div>
     <div>
         <div class="input-group">
-            <input type="text" id="networkSearch" class="form-control" placeholder="Ara...">
+            <input type="text" id="networkSearch" class="form-control" placeholder="Ara..." data-i18n-placeholder="search">
             <button class="btn btn-primary" type="button" id="refreshBtn">
-                <i class="fas fa-sync-alt"></i> Yenile
+                <i class="fas fa-sync-alt"></i> <span data-i18n="refresh">Yenile</span>
             </button>
             <button class="btn btn-success" type="button" data-bs-toggle="modal" data-bs-target="#createNetworkModal">
-                <i class="fas fa-plus"></i> Network Oluştur
+                <i class="fas fa-plus"></i> <span data-i18n="create_network">Network Oluştur</span>
             </button>
         </div>
     </div>
@@ -21,7 +21,7 @@
 
 {% if error %}
 <div class="alert alert-danger">
-    <strong>Hata:</strong> {{ error }}
+    <strong data-i18n="error">Hata:</strong> {{ error }}
 </div>
 {% endif %}
 
@@ -34,12 +34,12 @@
                         <th scope="col">
                             <input type="checkbox" class="form-check-input" id="selectAll">
                         </th>
-                        <th scope="col">İsim</th>
+                        <th scope="col" data-i18n="name">İsim</th>
                         <th scope="col">ID</th>
-                        <th scope="col">Sürücü</th>
-                        <th scope="col">Scope</th>
+                        <th scope="col" data-i18n="driver">Sürücü</th>
+                        <th scope="col" data-i18n="scope">Scope</th>
                         <th scope="col">IPAM</th>
-                        <th scope="col">İşlemler</th>
+                        <th scope="col" data-i18n="actions">İşlemler</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -69,12 +69,12 @@
                                     <i class="fas fa-ellipsis-v"></i>
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="dropdownMenuButton1">
-                                    <li><a class="dropdown-item" href="#">Detaylar</a></li>
-                                    <li><a class="dropdown-item" href="#">Bağlı Container'lar</a></li>
+                                    <li><a class="dropdown-item" href="#" data-i18n="details">Detaylar</a></li>
+                                    <li><a class="dropdown-item" href="#" data-i18n="connected_containers">Bağlı Container'lar</a></li>
                                     <li><hr class="dropdown-divider"></li>
                                     <li>
                                         <form action="#" method="POST" class="d-inline">
-                                            <button type="submit" class="dropdown-item text-danger">Sil</button>
+                                            <button type="submit" class="dropdown-item text-danger" data-i18n="delete">Sil</button>
                                         </form>
                                     </li>
                                 </ul>
@@ -83,7 +83,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="7" class="text-center">Hiç ağ bulunamadı.</td>
+                        <td colspan="7" class="text-center" data-i18n="no_networks">Hiç ağ bulunamadı.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -97,17 +97,17 @@
     <div class="modal-dialog modal-lg">
         <div class="modal-content bg-dark text-white">
             <div class="modal-header">
-                <h5 class="modal-title" id="createNetworkModalLabel">Yeni Network Oluştur</h5>
+                <h5 class="modal-title" id="createNetworkModalLabel" data-i18n="create_new_network">Yeni Network Oluştur</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Kapat"></button>
             </div>
             <div class="modal-body">
                 <form id="createNetworkForm">
                     <div class="mb-3">
-                        <label for="networkName" class="form-label">Network İsmi</label>
+                        <label for="networkName" class="form-label" data-i18n="network_name">Network İsmi</label>
                         <input type="text" class="form-control" id="networkName" required>
                     </div>
                     <div class="mb-3">
-                        <label for="networkDriver" class="form-label">Sürücü</label>
+                        <label for="networkDriver" class="form-label" data-i18n="driver">Sürücü</label>
                         <select class="form-select" id="networkDriver">
                             <option value="bridge" selected>bridge</option>
                             <option value="host">host</option>
@@ -117,18 +117,18 @@
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label for="networkSubnet" class="form-label">Subnet (örn: 172.18.0.0/16)</label>
+                        <label for="networkSubnet" class="form-label" data-i18n="subnet">Subnet (örn: 172.18.0.0/16)</label>
                         <input type="text" class="form-control" id="networkSubnet">
                     </div>
                     <div class="mb-3">
-                        <label for="networkGateway" class="form-label">Gateway (örn: 172.18.0.1)</label>
+                        <label for="networkGateway" class="form-label" data-i18n="gateway">Gateway (örn: 172.18.0.1)</label>
                         <input type="text" class="form-control" id="networkGateway">
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
-                <button type="button" class="btn btn-primary" id="createNetworkBtn">Oluştur</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="cancel">İptal</button>
+                <button type="button" class="btn btn-primary" id="createNetworkBtn" data-i18n="create">Oluştur</button>
             </div>
         </div>
     </div>

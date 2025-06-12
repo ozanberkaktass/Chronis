@@ -3,17 +3,17 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-        <h1 class="h3">Volume Listesi</h1>
-        <p class="text-muted">Tüm Docker volume'larınızı görüntüleyin ve yönetin</p>
+        <h1 class="h3" data-i18n="volumes">Volume Listesi</h1>
+        <p class="text-muted" data-i18n="volumes_desc">Tüm Docker volume'larınızı görüntüleyin ve yönetin</p>
     </div>
     <div>
         <div class="input-group">
-            <input type="text" id="volumeSearch" class="form-control" placeholder="Ara...">
+            <input type="text" id="volumeSearch" class="form-control" placeholder="Ara..." data-i18n-placeholder="search">
             <button class="btn btn-primary" type="button" id="refreshBtn">
-                <i class="fas fa-sync-alt"></i> Yenile
+                <i class="fas fa-sync-alt"></i> <span data-i18n="refresh">Yenile</span>
             </button>
             <button class="btn btn-success" type="button" data-bs-toggle="modal" data-bs-target="#createVolumeModal">
-                <i class="fas fa-plus"></i> Volume Oluştur
+                <i class="fas fa-plus"></i> <span data-i18n="create_volume">Volume Oluştur</span>
             </button>
         </div>
     </div>
@@ -21,7 +21,7 @@
 
 {% if error %}
 <div class="alert alert-danger">
-    <strong>Hata:</strong> {{ error }}
+    <strong data-i18n="error">Hata:</strong> {{ error }}
 </div>
 {% endif %}
 
@@ -34,11 +34,11 @@
                         <th scope="col">
                             <input type="checkbox" class="form-check-input" id="selectAll">
                         </th>
-                        <th scope="col">İsim</th>
-                        <th scope="col">Sürücü</th>
-                        <th scope="col">Bağlama Noktası</th>
-                        <th scope="col">Oluşturuldu</th>
-                        <th scope="col">İşlemler</th>
+                        <th scope="col" data-i18n="name">İsim</th>
+                        <th scope="col" data-i18n="driver">Sürücü</th>
+                        <th scope="col" data-i18n="mount_point">Bağlama Noktası</th>
+                        <th scope="col" data-i18n="created">Oluşturuldu</th>
+                        <th scope="col" data-i18n="actions">İşlemler</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -57,12 +57,12 @@
                                     <i class="fas fa-ellipsis-v"></i>
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="dropdownMenuButton1">
-                                    <li><a class="dropdown-item" href="#">Detaylar</a></li>
-                                    <li><a class="dropdown-item" href="#">Veri Görüntüle</a></li>
+                                    <li><a class="dropdown-item" href="#" data-i18n="details">Detaylar</a></li>
+                                    <li><a class="dropdown-item" href="#" data-i18n="view_data">Veri Görüntüle</a></li>
                                     <li><hr class="dropdown-divider"></li>
                                     <li>
                                         <form action="#" method="POST" class="d-inline">
-                                            <button type="submit" class="dropdown-item text-danger">Sil</button>
+                                            <button type="submit" class="dropdown-item text-danger" data-i18n="delete">Sil</button>
                                         </form>
                                     </li>
                                 </ul>
@@ -71,7 +71,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="6" class="text-center">Hiç volume bulunamadı.</td>
+                        <td colspan="6" class="text-center" data-i18n="no_volumes">Hiç volume bulunamadı.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -85,17 +85,17 @@
     <div class="modal-dialog modal-lg">
         <div class="modal-content bg-dark text-white">
             <div class="modal-header">
-                <h5 class="modal-title" id="createVolumeModalLabel">Yeni Volume Oluştur</h5>
+                <h5 class="modal-title" id="createVolumeModalLabel" data-i18n="create_new_volume">Yeni Volume Oluştur</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Kapat"></button>
             </div>
             <div class="modal-body">
                 <form id="createVolumeForm">
                     <div class="mb-3">
-                        <label for="volumeName" class="form-label">Volume İsmi</label>
+                        <label for="volumeName" class="form-label" data-i18n="volume_name">Volume İsmi</label>
                         <input type="text" class="form-control" id="volumeName" required>
                     </div>
                     <div class="mb-3">
-                        <label for="volumeDriver" class="form-label">Sürücü</label>
+                        <label for="volumeDriver" class="form-label" data-i18n="driver">Sürücü</label>
                         <select class="form-select" id="volumeDriver">
                             <option value="local" selected>local</option>
                         </select>
@@ -103,8 +103,8 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
-                <button type="button" class="btn btn-primary" id="createVolumeBtn">Oluştur</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="cancel">İptal</button>
+                <button type="button" class="btn btn-primary" id="createVolumeBtn" data-i18n="create">Oluştur</button>
             </div>
         </div>
     </div>

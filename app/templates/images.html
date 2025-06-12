@@ -3,17 +3,17 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-        <h1 class="h3">Image Listesi</h1>
-        <p class="text-muted">Tüm Docker image'larınızı görüntüleyin</p>
+        <h1 class="h3" data-i18n="images">Image Listesi</h1>
+        <p class="text-muted" data-i18n="images_desc">Tüm Docker image'larınızı görüntüleyin</p>
     </div>
     <div>
         <div class="input-group">
-            <input type="text" id="imageSearch" class="form-control" placeholder="Ara...">
+            <input type="text" id="imageSearch" class="form-control" placeholder="Ara..." data-i18n-placeholder="search">
             <button class="btn btn-primary" type="button" id="refreshBtn">
-                <i class="fas fa-sync-alt"></i> Yenile
+                <i class="fas fa-sync-alt"></i> <span data-i18n="refresh">Yenile</span>
             </button>
             <button class="btn btn-success" type="button" data-bs-toggle="modal" data-bs-target="#pullImageModal">
-                <i class="fas fa-download"></i> Image Çek
+                <i class="fas fa-download"></i> <span data-i18n="pull_image">Image Çek</span>
             </button>
         </div>
     </div>
@@ -21,7 +21,7 @@
 
 {% if error %}
 <div class="alert alert-danger">
-    <strong>Hata:</strong> {{ error }}
+    <strong data-i18n="error">Hata:</strong> {{ error }}
 </div>
 {% endif %}
 
@@ -35,10 +35,10 @@
                             <input type="checkbox" class="form-check-input" id="selectAll">
                         </th>
                         <th scope="col">ID</th>
-                        <th scope="col">İsim/Tag</th>
-                        <th scope="col">Boyut</th>
-                        <th scope="col">Oluşturuldu</th>
-                        <th scope="col">İşlemler</th>
+                        <th scope="col" data-i18n="name_tag">İsim/Tag</th>
+                        <th scope="col" data-i18n="size">Boyut</th>
+                        <th scope="col" data-i18n="created">Oluşturuldu</th>
+                        <th scope="col" data-i18n="actions">İşlemler</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -54,7 +54,7 @@
                                     <span class="badge bg-info">{{ tag }}</span>
                                 {% endfor %}
                             {% else %}
-                                <span class="badge bg-secondary">No Tags</span>
+                                <span class="badge bg-secondary" data-i18n="no_tags">No Tags</span>
                             {% endif %}
                         </td>
                         <td>{{ (image.attrs.Size / 1000000) | round(2) }} MB</td>
@@ -65,12 +65,12 @@
                                     <i class="fas fa-ellipsis-v"></i>
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="dropdownMenuButton1">
-                                    <li><a class="dropdown-item" href="#">Detaylar</a></li>
-                                    <li><a class="dropdown-item" href="#">Container Oluştur</a></li>
+                                    <li><a class="dropdown-item" href="#" data-i18n="details">Detaylar</a></li>
+                                    <li><a class="dropdown-item" href="#" data-i18n="create_container">Container Oluştur</a></li>
                                     <li><hr class="dropdown-divider"></li>
                                     <li>
                                         <form action="#" method="POST" class="d-inline">
-                                            <button type="submit" class="dropdown-item text-danger">Sil</button>
+                                            <button type="submit" class="dropdown-item text-danger" data-i18n="delete">Sil</button>
                                         </form>
                                     </li>
                                 </ul>
@@ -79,7 +79,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="6" class="text-center">Hiç image bulunamadı.</td>
+                        <td colspan="6" class="text-center" data-i18n="no_images">Hiç image bulunamadı.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -93,20 +93,20 @@
     <div class="modal-dialog modal-lg">
         <div class="modal-content bg-dark text-white">
             <div class="modal-header">
-                <h5 class="modal-title" id="pullImageModalLabel">Docker Image Çek</h5>
+                <h5 class="modal-title" id="pullImageModalLabel" data-i18n="pull_docker_image">Docker Image Çek</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Kapat"></button>
             </div>
             <div class="modal-body">
                 <form id="pullImageForm">
                     <div class="mb-3">
-                        <label for="imageName" class="form-label">Image İsmi</label>
+                        <label for="imageName" class="form-label" data-i18n="image_name">Image İsmi</label>
                         <input type="text" class="form-control" id="imageName" placeholder="örn: nginx:latest" required>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
-                <button type="button" class="btn btn-primary" id="pullImageBtn">Çek</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="cancel">İptal</button>
+                <button type="button" class="btn btn-primary" id="pullImageBtn" data-i18n="pull">Çek</button>
             </div>
         </div>
     </div>
