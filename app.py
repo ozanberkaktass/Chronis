@@ -6,9 +6,18 @@ import re
 import random
 import datetime
 import time
+import pty
+import fcntl
+import struct
+import termios
+import signal
+import uuid
+import threading
+from functools import wraps
 
 # Flask uygulamasını başlat ve şablon klasörünü doğru şekilde ayarla
-from flask import Flask, render_template, redirect, url_for, flash, request, jsonify
+from flask import Flask, render_template, redirect, url_for, flash, request, jsonify, session
+from flask_socketio import SocketIO, emit, disconnect
 from werkzeug.utils import secure_filename
 
 # Flask uygulamasını başlat ve şablon klasörünü doğru şekilde ayarla
@@ -17,9 +26,31 @@ static_dir = os.path.abspath('app/static')
 app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
 app.secret_key = "chronis_gizli_anahtar"  # Gerçek uygulamada değiştirin
 
+# Socket.IO
+socketio = SocketIO(app, cors_allowed_origins="*")
+
 # Global değişken olarak Docker istemcisini tanımla
 client = None
 cli_client = None
+
+# Terminal oturumları için kaydı tutacak dictionary
+terminal_sessions = {}
+active_terminals = {}
+recording_sessions = {}
+
+# Oturum kayıtları için klasör
+RECORDINGS_DIR = os.path.join(static_dir, 'recordings')
+os.makedirs(RECORDINGS_DIR, exist_ok=True)
+
+# Yetkilendirme kontrolü için dekoratör
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('admin'):
+            flash('Bu sayfayı görüntülemek için yönetici hakları gereklidir.', 'error')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 # Docker CLI tabanlı alternatif istemci
 class DockerCLIClient:
@@ -373,6 +404,433 @@ def connect_to_docker(max_attempts=1, delay=1):
 # Uygulama başlangıcında Docker'a bağlan
 connect_to_docker()
 
+# Terminal işlemleri
+def create_terminal(fd, pid):
+    """Terminal verilerini işle ve sockete gönder"""
+    def read_and_forward_terminal_output():
+        max_read_bytes = 1024 * 20
+        while True:
+            try:
+                data = os.read(fd, max_read_bytes)
+                socketio.emit('data', data.decode(), namespace='/terminal', room=request.sid)
+                
+                # Kayıt yapılıyorsa verileri kaydet
+                if request.sid in recording_sessions and recording_sessions[request.sid]['recording']:
+                    recording_sessions[request.sid]['data'].append({
+                        'type': 'output',
+                        'data': data.decode(),
+                        'time': datetime.datetime.now().isoformat()
+                    })
+            except (OSError, IOError):
+                break
+    
+    # Arka planda terminal çıktısını oku
+    thread = threading.Thread(target=read_and_forward_terminal_output)
+    thread.daemon = True
+    thread.start()
+    
+    return thread
+
+def get_terminal_size(fd):
+    """Terminal boyutunu al"""
+    size = struct.pack('HHHH', 0, 0, 0, 0)
+    size = fcntl.ioctl(fd, termios.TIOCGWINSZ, size)
+    rows, cols, _, _ = struct.unpack('HHHH', size)
+    return rows, cols
+
+def set_terminal_size(fd, rows, cols):
+    """Terminal boyutunu ayarla"""
+    size = struct.pack('HHHH', rows, cols, 0, 0)
+    fcntl.ioctl(fd, termios.TIOCSWINSZ, size)
+
+# Socket.IO terminal olayları
+@socketio.on('connect', namespace='/terminal')
+def connect():
+    """Yeni bağlantı"""
+    pass
+
+@socketio.on('disconnect', namespace='/terminal')
+def disconnect_terminal():
+    """Bağlantı kesildiğinde"""
+    if request.sid in active_terminals:
+        # Terminal prosesini sonlandır
+        if active_terminals[request.sid]['pid']:
+            try:
+                os.kill(active_terminals[request.sid]['pid'], signal.SIGTERM)
+            except OSError:
+                pass
+            
+        # Kayıt yapılıyorsa oturumu kaydet
+        if request.sid in recording_sessions and recording_sessions[request.sid]['recording']:
+            save_recording(request.sid)
+        
+        # Active terminal listesinden çıkar
+        del active_terminals[request.sid]
+    
+    # Kayıt durumunu temizle
+    if request.sid in recording_sessions:
+        del recording_sessions[request.sid]
+
+@socketio.on('start', namespace='/terminal')
+def start_terminal(data):
+    """Terminal oturumu başlat"""
+    connection_type = data.get('type')
+    
+    if connection_type == 'container':
+        # Container'da terminal başlat
+        container_id = data.get('containerId')
+        cmd = data.get('cmd', '/bin/bash')
+        
+        # Container çalışıyor mu kontrol et
+        try:
+            container = client.containers.get(container_id)
+            if container.status != 'running':
+                emit('error', 'Container çalışmıyor.')
+                return
+        except Exception as e:
+            emit('error', f'Container bulunamadı: {str(e)}')
+            return
+        
+        # Exec oluştur ve başlat
+        try:
+            # PTY açılımı
+            master_fd, slave_fd = pty.openpty()
+            
+            # Docker exec komutu
+            exec_command = f"docker exec -it {container_id} {cmd}"
+            process = subprocess.Popen(
+                exec_command,
+                shell=True,
+                stdin=slave_fd,
+                stdout=slave_fd,
+                stderr=slave_fd,
+                close_fds=True
+            )
+            
+            # Terminal boyutunu ayarla
+            set_terminal_size(master_fd, data.get('rows', 24), data.get('cols', 80))
+            
+            # Aktif terminaller listesine ekle
+            active_terminals[request.sid] = {
+                'fd': master_fd,
+                'pid': process.pid,
+                'type': 'container',
+                'target': container_id,
+                'start_time': datetime.datetime.now()
+            }
+            
+            # Terminal verilerini okuma ve yönlendirme
+            create_terminal(master_fd, process.pid)
+            
+            # Kayıt başlat
+            if data.get('record', False):
+                recording_sessions[request.sid] = {
+                    'recording': True,
+                    'data': [],
+                    'type': 'container',
+                    'target': container_id,
+                    'start_time': datetime.datetime.now()
+                }
+            
+        except Exception as e:
+            emit('error', f'Terminal başlatılamadı: {str(e)}')
+            return
+    
+    elif connection_type == 'host':
+        # Host sistemde terminal başlat
+        try:
+            # Kullanıcının yetki kontrolü
+            if not session.get('admin'):
+                emit('error', 'Host terminal erişimi için yönetici hakları gerekiyor.')
+                return
+            
+            # PTY açılımı
+            master_fd, slave_fd = pty.openpty()
+            
+            # Shell başlat
+            process = subprocess.Popen(
+                ['/bin/bash'],
+                stdin=slave_fd,
+                stdout=slave_fd,
+                stderr=slave_fd,
+                close_fds=True
+            )
+            
+            # Terminal boyutunu ayarla
+            set_terminal_size(master_fd, data.get('rows', 24), data.get('cols', 80))
+            
+            # Aktif terminaller listesine ekle
+            active_terminals[request.sid] = {
+                'fd': master_fd,
+                'pid': process.pid,
+                'type': 'host',
+                'target': 'host',
+                'start_time': datetime.datetime.now()
+            }
+            
+            # Terminal verilerini okuma ve yönlendirme
+            create_terminal(master_fd, process.pid)
+            
+            # Kayıt başlat
+            if data.get('record', False):
+                recording_sessions[request.sid] = {
+                    'recording': True,
+                    'data': [],
+                    'type': 'host',
+                    'target': 'Host',
+                    'start_time': datetime.datetime.now()
+                }
+            
+        except Exception as e:
+            emit('error', f'Host terminal başlatılamadı: {str(e)}')
+            return
+    
+    elif connection_type == 'ssh':
+        # SSH bağlantısı başlat
+        try:
+            # SSH bilgilerini al
+            host = data.get('host')
+            port = data.get('port', 22)
+            username = data.get('username')
+            auth_type = data.get('authType')
+            
+            # Kimlik doğrulama için parametreler
+            ssh_command = f"ssh {username}@{host} -p {port}"
+            
+            if auth_type == 'key':
+                # SSH anahtarı kullanımı için
+                key_content = data.get('key', '')
+                
+                # Geçici anahtar dosyası oluştur
+                key_file = os.path.join(RECORDINGS_DIR, f"temp_key_{uuid.uuid4().hex}")
+                with open(key_file, 'w') as f:
+                    f.write(key_content)
+                os.chmod(key_file, 0o600)  # Dosya izinlerini ayarla
+                
+                ssh_command += f" -i {key_file}"
+            
+            # PTY açılımı
+            master_fd, slave_fd = pty.openpty()
+            
+            # SSH komutu başlat
+            process = subprocess.Popen(
+                ssh_command,
+                shell=True,
+                stdin=slave_fd,
+                stdout=slave_fd,
+                stderr=slave_fd,
+                close_fds=True
+            )
+            
+            # Terminal boyutunu ayarla
+            set_terminal_size(master_fd, data.get('rows', 24), data.get('cols', 80))
+            
+            # Aktif terminaller listesine ekle
+            active_terminals[request.sid] = {
+                'fd': master_fd,
+                'pid': process.pid,
+                'type': 'ssh',
+                'target': f"{username}@{host}:{port}",
+                'key_file': key_file if auth_type == 'key' else None,
+                'start_time': datetime.datetime.now()
+            }
+            
+            # Terminal verilerini okuma ve yönlendirme
+            create_terminal(master_fd, process.pid)
+            
+            # Kayıt başlat
+            if data.get('record', False):
+                recording_sessions[request.sid] = {
+                    'recording': True,
+                    'data': [],
+                    'type': 'ssh',
+                    'target': f"{username}@{host}",
+                    'start_time': datetime.datetime.now()
+                }
+            
+        except Exception as e:
+            emit('error', f'SSH bağlantısı başlatılamadı: {str(e)}')
+            return
+    
+    else:
+        emit('error', 'Geçersiz bağlantı tipi.')
+
+@socketio.on('data', namespace='/terminal')
+def handle_terminal_input(data):
+    """Terminal girdisi al ve işle"""
+    if request.sid in active_terminals:
+        fd = active_terminals[request.sid]['fd']
+        try:
+            os.write(fd, data.encode())
+            
+            # Kayıt yapılıyorsa verileri kaydet
+            if request.sid in recording_sessions and recording_sessions[request.sid]['recording']:
+                recording_sessions[request.sid]['data'].append({
+                    'type': 'input',
+                    'data': data,
+                    'time': datetime.datetime.now().isoformat()
+                })
+                
+        except (OSError, IOError) as e:
+            emit('error', f'Veri yazılırken hata oluştu: {str(e)}')
+
+@socketio.on('resize', namespace='/terminal')
+def resize_terminal(data):
+    """Terminal boyutunu değiştir"""
+    if request.sid in active_terminals:
+        fd = active_terminals[request.sid]['fd']
+        try:
+            set_terminal_size(fd, data.get('rows', 24), data.get('cols', 80))
+        except (OSError, IOError) as e:
+            emit('error', f'Terminal boyutu değiştirilirken hata oluştu: {str(e)}')
+
+@socketio.on('toggleRecord', namespace='/terminal')
+def toggle_recording(data):
+    """Terminal kaydını başlat/durdur"""
+    recording = data.get('recording', False)
+    
+    if request.sid in active_terminals:
+        # Kayıt var mı kontrol et
+        if request.sid not in recording_sessions:
+            # Yeni kayıt oluştur
+            recording_sessions[request.sid] = {
+                'recording': recording,
+                'data': [],
+                'type': active_terminals[request.sid]['type'],
+                'target': active_terminals[request.sid]['target'],
+                'start_time': datetime.datetime.now()
+            }
+        else:
+            # Mevcut kaydı güncelle
+            if recording and not recording_sessions[request.sid]['recording']:
+                # Kaydı başlat
+                recording_sessions[request.sid]['recording'] = True
+            elif not recording and recording_sessions[request.sid]['recording']:
+                # Kaydı durdur ve kaydet
+                recording_sessions[request.sid]['recording'] = False
+                save_recording(request.sid)
+
+def save_recording(sid):
+    """Terminal kaydını kaydet"""
+    if sid in recording_sessions:
+        recording = recording_sessions[sid]
+        recording_id = uuid.uuid4().hex
+        
+        # Kayıt meta verisi
+        metadata = {
+            'id': recording_id,
+            'type': recording['type'],
+            'target': recording['target'],
+            'start_time': recording['start_time'].isoformat(),
+            'end_time': datetime.datetime.now().isoformat(),
+            'user': session.get('username', 'anonymous')
+        }
+        
+        # Kayıt verisi
+        recording_data = {
+            'metadata': metadata,
+            'events': recording['data']
+        }
+        
+        # Kayıt dosyasını oluştur
+        recording_file = os.path.join(RECORDINGS_DIR, f"{recording_id}.json")
+        with open(recording_file, 'w') as f:
+            json.dump(recording_data, f)
+        
+        # Terminal oturumları listesine ekle
+        terminal_sessions[recording_id] = metadata
+        
+        return recording_id
+    
+    return None
+
+# Terminal sayfası
+@app.route('/terminal')
+def terminal():
+    """Terminal sayfasını görüntüle"""
+    return render_template('terminal.html', title='Terminal')
+
+# Çalışan containerları getir (terminal için)
+@app.route('/api/containers/running')
+def get_running_containers():
+    """Çalışan container listesini getir"""
+    try:
+        if client:
+            containers = client.containers.list(filters={"status": "running"})
+            container_list = []
+            
+            for container in containers:
+                container_list.append({
+                    'id': container.id,
+                    'name': container.name
+                })
+            
+            return jsonify(container_list)
+        elif cli_client and cli_client.available:
+            containers = cli_client.containers_list(all=False)
+            container_list = []
+            
+            for container in containers:
+                if container.status == 'running':
+                    container_list.append({
+                        'id': container.id,
+                        'name': container.name
+                    })
+            
+            return jsonify(container_list)
+        else:
+            return jsonify([])
+    except Exception as e:
+        return jsonify([])
+
+# Terminal oturumlarını getir
+@app.route('/api/terminal/sessions')
+def get_terminal_sessions():
+    """Kayıtlı terminal oturumlarını getir"""
+    sessions_list = []
+    
+    for recording_id, metadata in terminal_sessions.items():
+        sessions_list.append(metadata)
+    
+    # Oturumları tarih sırasına göre sırala (en yeniden en eskiye)
+    sessions_list.sort(key=lambda x: x['start_time'], reverse=True)
+    
+    return jsonify(sessions_list)
+
+# Terminal kaydını getir
+@app.route('/api/terminal/recordings/<recording_id>')
+def get_terminal_recording(recording_id):
+    """Terminal kaydını getir"""
+    recording_file = os.path.join(RECORDINGS_DIR, f"{recording_id}.json")
+    
+    if os.path.exists(recording_file):
+        with open(recording_file, 'r') as f:
+            recording_data = json.load(f)
+        return jsonify(recording_data)
+    else:
+        return jsonify({'error': 'Kayıt bulunamadı'}), 404
+
+# Terminal kaydını sil
+@app.route('/api/terminal/recordings/<recording_id>', methods=['DELETE'])
+def delete_terminal_recording(recording_id):
+    """Terminal kaydını sil"""
+    recording_file = os.path.join(RECORDINGS_DIR, f"{recording_id}.json")
+    
+    if os.path.exists(recording_file):
+        try:
+            os.remove(recording_file)
+            
+            # Terminal oturumları listesinden kaldır
+            if recording_id in terminal_sessions:
+                del terminal_sessions[recording_id]
+            
+            return jsonify({'success': True})
+        except Exception as e:
+            return jsonify({'error': f'Kayıt silinirken hata oluştu: {str(e)}'}), 500
+    else:
+        return jsonify({'error': 'Kayıt bulunamadı'}), 404
+
+# Ana fonksiyonlar
 @app.route('/')
 def index():
     return redirect(url_for('dashboard'))
@@ -726,5 +1184,6 @@ def format_date(value, format='%Y-%m-%d %H:%M'):
                 return value
     return value.strftime(format)
 
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000) 
+if __name__ == "__main__":
+    connect_to_docker()
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True, allow_unsafe_werkzeug=True) 

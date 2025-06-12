@@ -44,6 +44,11 @@
                     <i class="fas fa-database"></i> <span data-i18n="volumes">Volumes</span>
                 </a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link {{ 'active' if request.endpoint == 'terminal' else '' }}" href="{{ url_for('terminal') }}">
+                    <i class="fas fa-terminal"></i> <span data-i18n="terminal">Terminal</span>
+                </a>
+            </li>
         </ul>
         
         <div class="footer-version">

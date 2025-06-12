@@ -1,0 +1,507 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3" data-i18n="terminal">Terminal</h1>
+        <p class="text-muted" data-i18n="terminal_desc">Container ve host'lara web tabanlı terminal erişimi</p>
+    </div>
+    <div>
+        <button class="btn btn-primary" id="newSessionBtn" data-bs-toggle="modal" data-bs-target="#newSessionModal">
+            <i class="fas fa-plus"></i> <span data-i18n="new_session">Yeni Oturum</span>
+        </button>
+        <button class="btn btn-outline-secondary" id="sessionsBtn" data-bs-toggle="modal" data-bs-target="#sessionsModal">
+            <i class="fas fa-history"></i> <span data-i18n="sessions">Oturumlar</span>
+        </button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center">
+            <span id="activeConnection" class="badge bg-success me-2" style="display: none;">
+                <i class="fas fa-circle"></i> <span data-i18n="connected">Bağlı</span>
+            </span>
+            <span id="activeTarget">-</span>
+        </div>
+        <div>
+            <button class="btn btn-sm btn-outline-primary" id="recordToggle" disabled>
+                <i class="fas fa-circle text-danger"></i> <span data-i18n="record">Kaydet</span>
+            </button>
+            <button class="btn btn-sm btn-outline-danger" id="disconnectBtn" disabled>
+                <i class="fas fa-times"></i> <span data-i18n="disconnect">Bağlantıyı Kes</span>
+            </button>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div id="terminal-container" style="height: 500px; padding: 10px; overflow: hidden; background-color: #1e1e1e;">
+            <div id="terminal-placeholder" class="d-flex flex-column justify-content-center align-items-center h-100 text-muted">
+                <i class="fas fa-terminal fa-3x mb-3"></i>
+                <p data-i18n="terminal_placeholder">Bir terminal oturumu başlatmak için "Yeni Oturum" butonuna tıklayın.</p>
+            </div>
+            <div id="terminal" style="height: 100%; display: none;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Yeni Oturum Modal -->
+<div class="modal fade" id="newSessionModal" tabindex="-1" aria-labelledby="newSessionModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark text-white">
+            <div class="modal-header">
+                <h5 class="modal-title" id="newSessionModalLabel" data-i18n="new_terminal_session">Yeni Terminal Oturumu</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Kapat"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="connectionType" class="form-label" data-i18n="connection_type">Bağlantı Tipi</label>
+                    <select class="form-select" id="connectionType">
+                        <option value="container" data-i18n="container">Container</option>
+                        <option value="host" data-i18n="host">Host</option>
+                        <option value="ssh" data-i18n="ssh">SSH</option>
+                    </select>
+                </div>
+                
+                <div id="containerSection">
+                    <div class="mb-3">
+                        <label for="containerSelect" class="form-label" data-i18n="select_container">Container Seçin</label>
+                        <select class="form-select" id="containerSelect">
+                            <option value="" data-i18n="loading">Yükleniyor...</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="containerCmd" class="form-label" data-i18n="command">Komut</label>
+                        <input type="text" class="form-control" id="containerCmd" value="/bin/bash" placeholder="örn: /bin/bash, /bin/sh">
+                    </div>
+                </div>
+                
+                <div id="hostSection" style="display: none;">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i> <span data-i18n="host_terminal_warning">Host terminal erişimi sistem güvenliğini etkileyebilir. Yalnızca yetkili kullanıcılar için önerilir.</span>
+                    </div>
+                </div>
+                
+                <div id="sshSection" style="display: none;">
+                    <div class="mb-3">
+                        <label for="sshHost" class="form-label" data-i18n="ssh_host">SSH Host</label>
+                        <input type="text" class="form-control" id="sshHost" placeholder="örn: 192.168.1.100">
+                    </div>
+                    <div class="mb-3">
+                        <label for="sshPort" class="form-label" data-i18n="ssh_port">SSH Port</label>
+                        <input type="number" class="form-control" id="sshPort" value="22">
+                    </div>
+                    <div class="mb-3">
+                        <label for="sshUsername" class="form-label" data-i18n="username">Kullanıcı Adı</label>
+                        <input type="text" class="form-control" id="sshUsername" placeholder="örn: admin">
+                    </div>
+                    <div class="mb-3">
+                        <label for="sshAuthType" class="form-label" data-i18n="auth_type">Kimlik Doğrulama Tipi</label>
+                        <select class="form-select" id="sshAuthType">
+                            <option value="password" data-i18n="password">Şifre</option>
+                            <option value="key" data-i18n="ssh_key">SSH Anahtarı</option>
+                        </select>
+                    </div>
+                    <div id="passwordSection" class="mb-3">
+                        <label for="sshPassword" class="form-label" data-i18n="password">Şifre</label>
+                        <input type="password" class="form-control" id="sshPassword">
+                    </div>
+                    <div id="keySection" class="mb-3" style="display: none;">
+                        <label for="sshKey" class="form-label" data-i18n="ssh_private_key">SSH Özel Anahtarı</label>
+                        <textarea class="form-control" id="sshKey" rows="3" placeholder="-----BEGIN RSA PRIVATE KEY-----"></textarea>
+                    </div>
+                </div>
+                
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="recordSession">
+                    <label class="form-check-label" for="recordSession" data-i18n="record_session">Oturumu kaydet</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="cancel">İptal</button>
+                <button type="button" class="btn btn-primary" id="startSessionBtn" data-i18n="connect">Bağlan</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Oturumlar Modal -->
+<div class="modal fade" id="sessionsModal" tabindex="-1" aria-labelledby="sessionsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark text-white">
+            <div class="modal-header">
+                <h5 class="modal-title" id="sessionsModalLabel" data-i18n="terminal_sessions">Terminal Oturumları</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Kapat"></button>
+            </div>
+            <div class="modal-body">
+                <table class="table table-dark">
+                    <thead>
+                        <tr>
+                            <th data-i18n="target">Hedef</th>
+                            <th data-i18n="type">Tip</th>
+                            <th data-i18n="user">Kullanıcı</th>
+                            <th data-i18n="date">Tarih</th>
+                            <th data-i18n="duration">Süre</th>
+                            <th data-i18n="actions">İşlemler</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sessionsList">
+                        <tr>
+                            <td colspan="6" class="text-center" data-i18n="no_sessions">Kayıtlı oturum bulunamadı.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="close">Kapat</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Kayıt İzleme Modal -->
+<div class="modal fade" id="playbackModal" tabindex="-1" aria-labelledby="playbackModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark text-white">
+            <div class="modal-header">
+                <h5 class="modal-title" id="playbackModalLabel" data-i18n="session_playback">Oturum Kaydı İzleme</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Kapat"></button>
+            </div>
+            <div class="modal-body">
+                <div id="playback-container" style="height: 400px; background-color: #1e1e1e; border-radius: 5px; padding: 10px;">
+                    <div id="playback-terminal"></div>
+                </div>
+                <div class="mt-3">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-primary" id="playBtn">
+                                <i class="fas fa-play"></i> <span data-i18n="play">Oynat</span>
+                            </button>
+                            <button class="btn btn-sm btn-secondary" id="pauseBtn" disabled>
+                                <i class="fas fa-pause"></i> <span data-i18n="pause">Duraklat</span>
+                            </button>
+                            <button class="btn btn-sm btn-secondary" id="stopBtn" disabled>
+                                <i class="fas fa-stop"></i> <span data-i18n="stop">Durdur</span>
+                            </button>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <span data-i18n="speed">Hız:</span>
+                            <select class="form-select form-select-sm ms-2" id="playbackSpeed" style="width: 100px;">
+                                <option value="0.5">0.5x</option>
+                                <option value="1" selected>1x</option>
+                                <option value="2">2x</option>
+                                <option value="4">4x</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="progress mt-3">
+                        <div id="playbackProgress" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-primary" id="downloadRecordingBtn">
+                    <i class="fas fa-download"></i> <span data-i18n="download">İndir</span>
+                </button>
+                <button type="button" class="btn btn-outline-danger" id="deleteRecordingBtn">
+                    <i class="fas fa-trash"></i> <span data-i18n="delete">Sil</span>
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="close">Kapat</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/3.14.5/xterm.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/3.14.5/addons/fit/fit.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Değişkenler
+        let terminal;
+        let socket;
+        let currentSession = null;
+        let isRecording = false;
+        let playbackTerminal;
+        let playbackData = [];
+        let playbackInterval;
+        let playbackIndex = 0;
+        
+        // DOM Elementleri
+        const terminalContainer = document.getElementById('terminal');
+        const terminalPlaceholder = document.getElementById('terminal-placeholder');
+        const activeConnection = document.getElementById('activeConnection');
+        const activeTarget = document.getElementById('activeTarget');
+        const connectionType = document.getElementById('connectionType');
+        const containerSection = document.getElementById('containerSection');
+        const hostSection = document.getElementById('hostSection');
+        const sshSection = document.getElementById('sshSection');
+        const containerSelect = document.getElementById('containerSelect');
+        const sshAuthType = document.getElementById('sshAuthType');
+        const passwordSection = document.getElementById('passwordSection');
+        const keySection = document.getElementById('keySection');
+        const recordToggle = document.getElementById('recordToggle');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const sessionsList = document.getElementById('sessionsList');
+        
+        // Terminal başlatma
+        function initTerminal() {
+            // Eğer terminal zaten oluşturulmuşsa temizle
+            if (terminal) {
+                terminal.dispose();
+            }
+            
+            // Yeni terminal oluştur
+            terminal = new Terminal({
+                cursorBlink: true,
+                scrollback: 1000,
+                theme: {
+                    background: '#1e1e1e',
+                    foreground: '#f0f0f0',
+                    cursor: '#f0f0f0'
+                }
+            });
+            
+            // xterm.js'e fit eklentisini yükle
+            Terminal.applyAddon(fit);
+            
+            // Terminali container'a bağla
+            terminal.open(terminalContainer);
+            terminal.fit();
+            
+            // Terminal boyutu değişikliği
+            window.addEventListener('resize', () => {
+                terminal.fit();
+                if (socket && socket.connected) {
+                    socket.emit('resize', {
+                        cols: terminal.cols,
+                        rows: terminal.rows
+                    });
+                }
+            });
+            
+            return terminal;
+        }
+        
+        // Bağlantı tipine göre alanları göster/gizle
+        connectionType.addEventListener('change', function() {
+            const type = this.value;
+            
+            containerSection.style.display = type === 'container' ? 'block' : 'none';
+            hostSection.style.display = type === 'host' ? 'block' : 'none';
+            sshSection.style.display = type === 'ssh' ? 'block' : 'none';
+            
+            // Container listesini yükle
+            if (type === 'container') {
+                loadContainers();
+            }
+        });
+        
+        // SSH kimlik doğrulama tipine göre alanları göster/gizle
+        sshAuthType.addEventListener('change', function() {
+            const type = this.value;
+            
+            passwordSection.style.display = type === 'password' ? 'block' : 'none';
+            keySection.style.display = type === 'key' ? 'block' : 'none';
+        });
+        
+        // Container listesini yükle
+        function loadContainers() {
+            fetch('/api/containers/running')
+                .then(response => response.json())
+                .then(data => {
+                    containerSelect.innerHTML = '';
+                    
+                    if (data.length === 0) {
+                        const option = document.createElement('option');
+                        option.value = '';
+                        option.textContent = 'Çalışan container bulunamadı';
+                        containerSelect.appendChild(option);
+                    } else {
+                        data.forEach(container => {
+                            const option = document.createElement('option');
+                            option.value = container.id;
+                            option.textContent = container.name;
+                            containerSelect.appendChild(option);
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Container listesi alınamadı:', error);
+                    containerSelect.innerHTML = '<option value="">Hata: Container listesi alınamadı</option>';
+                });
+        }
+        
+        // Terminal oturumu başlat
+        document.getElementById('startSessionBtn').addEventListener('click', function() {
+            const type = connectionType.value;
+            let target = '';
+            let params = {};
+            
+            // Bağlantı tipine göre parametreleri hazırla
+            if (type === 'container') {
+                target = containerSelect.options[containerSelect.selectedIndex].textContent;
+                params = {
+                    type: 'container',
+                    containerId: containerSelect.value,
+                    cmd: document.getElementById('containerCmd').value || '/bin/bash'
+                };
+            } else if (type === 'host') {
+                target = 'Host';
+                params = {
+                    type: 'host'
+                };
+            } else if (type === 'ssh') {
+                const host = document.getElementById('sshHost').value;
+                target = host;
+                params = {
+                    type: 'ssh',
+                    host: host,
+                    port: document.getElementById('sshPort').value,
+                    username: document.getElementById('sshUsername').value,
+                    authType: sshAuthType.value
+                };
+                
+                if (sshAuthType.value === 'password') {
+                    params.password = document.getElementById('sshPassword').value;
+                } else {
+                    params.key = document.getElementById('sshKey').value;
+                }
+            }
+            
+            // Kayıt seçeneğini al
+            const recordSession = document.getElementById('recordSession').checked;
+            
+            // Modali kapat
+            const modal = bootstrap.Modal.getInstance(document.getElementById('newSessionModal'));
+            modal.hide();
+            
+            // Terminal görünümünü ayarla
+            terminalPlaceholder.style.display = 'none';
+            terminalContainer.style.display = 'block';
+            
+            // Terminali başlat ve bağlantıyı kur
+            const term = initTerminal();
+            term.writeln('Bağlanıyor...');
+            
+            // Socket.io bağlantısı
+            socket = io.connect('/terminal');
+            
+            // Bağlantı kurulduğunda
+            socket.on('connect', () => {
+                // Terminal oturumu başlat
+                socket.emit('start', {
+                    ...params,
+                    cols: term.cols,
+                    rows: term.rows,
+                    record: recordSession
+                });
+                
+                // Aktif bağlantı bilgilerini güncelle
+                activeConnection.style.display = 'inline-block';
+                activeTarget.textContent = target;
+                recordToggle.disabled = false;
+                disconnectBtn.disabled = false;
+                
+                // Kayıt durumunu ayarla
+                isRecording = recordSession;
+                updateRecordButton();
+                
+                // Oturum bilgilerini kaydet
+                currentSession = {
+                    id: socket.id,
+                    target: target,
+                    type: type,
+                    startTime: new Date(),
+                    recording: recordSession
+                };
+            });
+            
+            // Terminal veri alındığında
+            socket.on('data', (data) => {
+                term.write(data);
+            });
+            
+            // Terminal veri gönderildiğinde
+            term.onData(data => {
+                socket.emit('data', data);
+            });
+            
+            // Bağlantı kesildiğinde
+            socket.on('disconnect', () => {
+                term.writeln('\r\n\nBağlantı kesildi.');
+                resetConnection();
+            });
+            
+            // Hata durumunda
+            socket.on('error', (error) => {
+                term.writeln(`\r\n\nHata: ${error}`);
+                resetConnection();
+            });
+        });
+        
+        // Kayıt düğmesini güncelle
+        function updateRecordButton() {
+            if (isRecording) {
+                recordToggle.innerHTML = '<i class="fas fa-stop text-danger"></i> <span data-i18n="stop_recording">Kaydı Durdur</span>';
+                recordToggle.classList.remove('btn-outline-primary');
+                recordToggle.classList.add('btn-outline-danger');
+            } else {
+                recordToggle.innerHTML = '<i class="fas fa-circle text-danger"></i> <span data-i18n="record">Kaydet</span>';
+                recordToggle.classList.remove('btn-outline-danger');
+                recordToggle.classList.add('btn-outline-primary');
+            }
+        }
+        
+        // Kayıt düğmesi tıklandığında
+        recordToggle.addEventListener('click', function() {
+            if (!socket || !socket.connected) return;
+            
+            isRecording = !isRecording;
+            socket.emit('toggleRecord', { recording: isRecording });
+            updateRecordButton();
+        });
+        
+        // Bağlantıyı kes düğmesi tıklandığında
+        disconnectBtn.addEventListener('click', function() {
+            if (!socket || !socket.connected) return;
+            
+            socket.disconnect();
+            resetConnection();
+        });
+        
+        // Bağlantıyı sıfırla
+        function resetConnection() {
+            activeConnection.style.display = 'none';
+            activeTarget.textContent = '-';
+            recordToggle.disabled = true;
+            disconnectBtn.disabled = true;
+            
+            // Terminal görünümünü sıfırla
+            terminalContainer.style.display = 'none';
+            terminalPlaceholder.style.display = 'flex';
+            
+            // Oturum bilgilerini sıfırla
+            if (currentSession) {
+                currentSession.endTime = new Date();
+                currentSession = null;
+            }
+            
+            // Socket bağlantısını kapat
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+            }
+        }
+        
+        // Sayfa yüklendiğinde container listesini yükle
+        loadContainers();
+        
+        // Dil desteği için
+        document.addEventListener('translationsLoaded', function(e) {
+            // Terminal sayfası için özel çeviriler
+        });
+    });
+</script>
+{% endblock %} 
