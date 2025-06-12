@@ -1,6 +1,6 @@
 {% extends "layout.html" %}
 
-{% block title %}{{ _("Terminal") }}{% endblock %}
+{% block title %}Terminal{% endblock %}
 
 {% block styles %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/xterm.css') }}">
@@ -47,8 +47,8 @@
 <div class="container-fluid mt-4">
     <div class="row">
         <div class="col-12">
-            <h1>{{ _("Terminal") }}</h1>
-            <p>{{ _("Container ve host'lara web tabanlı terminal erişimi") }}</p>
+            <h1>Terminal</h1>
+            <p>Container ve host'lara web tabanlı terminal erişimi</p>
         </div>
     </div>
     
@@ -57,14 +57,14 @@
             <div class="terminal-toolbar">
                 <div class="connection-status">
                     <span class="status-indicator status-disconnected" id="status-indicator"></span>
-                    <span id="connection-label">{{ _("Bağlı değil") }}</span>
+                    <span id="connection-label">Bağlı değil</span>
                 </div>
                 <div class="terminal-actions">
                     <button class="btn btn-primary" id="btn-new-session">
-                        <i class="fas fa-plus"></i> {{ _("Yeni Oturum") }}
+                        <i class="fas fa-plus"></i> Yeni Oturum
                     </button>
                     <button class="btn btn-outline-secondary" id="btn-sessions">
-                        <i class="fas fa-list"></i> {{ _("Oturumlar") }}
+                        <i class="fas fa-list"></i> Oturumlar
                     </button>
                 </div>
             </div>
@@ -83,34 +83,34 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="newSessionModalLabel">{{ _("Yeni Terminal Oturumu") }}</h5>
+                <h5 class="modal-title" id="newSessionModalLabel">Yeni Terminal Oturumu</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <div class="mb-3">
-                    <label for="session-type" class="form-label">{{ _("Oturum Tipi") }}</label>
+                    <label for="session-type" class="form-label">Oturum Tipi</label>
                     <select class="form-select" id="session-type">
                         <option value="ssh">SSH</option>
-                        <option value="container">{{ _("Konteyner") }}</option>
+                        <option value="container">Konteyner</option>
                     </select>
                 </div>
                 
                 <!-- SSH için alanlar -->
                 <div id="ssh-fields">
                     <div class="mb-3">
-                        <label for="ssh-host" class="form-label">{{ _("Sunucu Adresi") }}</label>
+                        <label for="ssh-host" class="form-label">Sunucu Adresi</label>
                         <input type="text" class="form-control" id="ssh-host" placeholder="örn: 192.168.1.100">
                     </div>
                     <div class="mb-3">
-                        <label for="ssh-port" class="form-label">{{ _("Port") }}</label>
+                        <label for="ssh-port" class="form-label">Port</label>
                         <input type="number" class="form-control" id="ssh-port" value="22">
                     </div>
                     <div class="mb-3">
-                        <label for="ssh-username" class="form-label">{{ _("Kullanıcı Adı") }}</label>
+                        <label for="ssh-username" class="form-label">Kullanıcı Adı</label>
                         <input type="text" class="form-control" id="ssh-username">
                     </div>
                     <div class="mb-3">
-                        <label for="ssh-password" class="form-label">{{ _("Şifre") }}</label>
+                        <label for="ssh-password" class="form-label">Şifre</label>
                         <input type="password" class="form-control" id="ssh-password">
                     </div>
                 </div>
@@ -118,16 +118,16 @@
                 <!-- Konteyner için alanlar -->
                 <div id="container-fields" style="display:none;">
                     <div class="mb-3">
-                        <label for="container-id" class="form-label">{{ _("Konteyner") }}</label>
+                        <label for="container-id" class="form-label">Konteyner</label>
                         <select class="form-select" id="container-id">
-                            <option value="">{{ _("Yükleniyor...") }}</option>
+                            <option value="">Yükleniyor...</option>
                         </select>
                     </div>
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ _("İptal") }}</button>
-                <button type="button" class="btn btn-primary" id="btn-connect">{{ _("Bağlan") }}</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                <button type="button" class="btn btn-primary" id="btn-connect">Bağlan</button>
             </div>
         </div>
     </div>
