@@ -1,0 +1,167 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3">Container Detayları: {{ container.name }}</h1>
+        <p class="text-muted">
+            <span class="badge {% if container.status == 'running' %}bg-success{% elif container.status == 'exited' %}bg-danger{% else %}bg-secondary{% endif %}">
+                {{ container.status }}
+            </span>
+        </p>
+    </div>
+    <div>
+        <a href="{{ url_for('container_logs', id=container.id) }}" class="btn btn-outline-light">
+            <i class="fas fa-file-alt"></i> Loglar
+        </a>
+        <a href="{{ url_for('container_list') }}" class="btn btn-outline-light">
+            <i class="fas fa-arrow-left"></i> Containers
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card bg-dark text-white mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Temel Bilgiler</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-dark">
+                    <tbody>
+                        <tr>
+                            <th>ID</th>
+                            <td>{{ container.id }}</td>
+                        </tr>
+                        <tr>
+                            <th>İsim</th>
+                            <td>{{ container.name }}</td>
+                        </tr>
+                        <tr>
+                            <th>Durum</th>
+                            <td>
+                                <span class="badge {% if container.status == 'running' %}bg-success{% elif container.status == 'exited' %}bg-danger{% else %}bg-secondary{% endif %}">
+                                    {{ container.status }}
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Image</th>
+                            <td>{{ container.image.tags[0] if container.image.tags else container.image }}</td>
+                        </tr>
+                        <tr>
+                            <th>Komut</th>
+                            <td><code>{{ container.command }}</code></td>
+                        </tr>
+                        <tr>
+                            <th>Oluşturulma</th>
+                            <td>{{ container.created }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card bg-dark text-white mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Ağ Bilgileri</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-dark">
+                    <tbody>
+                        <tr>
+                            <th>IP Adresi</th>
+                            <td>
+                                {% if container.attrs.NetworkSettings.Networks %}
+                                    {% for network_name, network in container.attrs.NetworkSettings.Networks.items() %}
+                                        {{ network.IPAddress }} ({{ network_name }})
+                                    {% endfor %}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Portlar</th>
+                            <td>
+                                {% if container.ports %}
+                                    {{ container.ports }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card bg-dark text-white mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">İşlemler</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex gap-2">
+                    {% if container.status == 'running' %}
+                    <form action="{{ url_for('stop_container', id=container.id) }}" method="POST" class="d-inline">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-stop"></i> Durdur
+                        </button>
+                    </form>
+                    <form action="{{ url_for('restart_container', id=container.id) }}" method="POST" class="d-inline">
+                        <button type="submit" class="btn btn-warning">
+                            <i class="fas fa-sync-alt"></i> Yeniden Başlat
+                        </button>
+                    </form>
+                    {% elif container.status == 'exited' %}
+                    <form action="{{ url_for('start_container', id=container.id) }}" method="POST" class="d-inline">
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-play"></i> Başlat
+                        </button>
+                    </form>
+                    {% endif %}
+                    <a href="{{ url_for('container_logs', id=container.id) }}" class="btn btn-info">
+                        <i class="fas fa-file-alt"></i> Loglar
+                    </a>
+                    <form action="{{ url_for('remove_container', id=container.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Bu container\'ı silmek istediğinizden emin misiniz?');">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-trash"></i> Sil
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if container.env %}
+<div class="card bg-dark text-white mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">Çevre Değişkenleri</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-dark table-hover">
+                <thead>
+                    <tr>
+                        <th>Anahtar</th>
+                        <th>Değer</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for env_var in container.env %}
+                    {% set parts = env_var.split('=', 1) %}
+                    <tr>
+                        <td>{{ parts[0] }}</td>
+                        <td>{{ parts[1] if parts|length > 1 else '' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %} 

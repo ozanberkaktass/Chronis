@@ -1,0 +1,108 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3">Container Logları: {{ container.name }}</h1>
+        <p class="text-muted">
+            <span class="badge {% if container.status == 'running' %}bg-success{% elif container.status == 'exited' %}bg-danger{% else %}bg-secondary{% endif %}">
+                {{ container.status }}
+            </span>
+            <span class="ms-2">Image: {{ container.image.tags[0] if container.image.tags else container.image }}</span>
+        </p>
+    </div>
+    <div>
+        <a href="{{ url_for('container_detail', id=container.id) }}" class="btn btn-outline-light">
+            <i class="fas fa-info-circle"></i> Detaylar
+        </a>
+        <a href="{{ url_for('container_list') }}" class="btn btn-outline-light">
+            <i class="fas fa-arrow-left"></i> Containers
+        </a>
+        <button class="btn btn-primary" id="refreshLogsBtn">
+            <i class="fas fa-sync-alt"></i> Yenile
+        </button>
+    </div>
+</div>
+
+<div class="card bg-dark text-white mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Loglar</span>
+        <div>
+            <button class="btn btn-sm btn-outline-light" id="copyLogsBtn">
+                <i class="fas fa-copy"></i> Kopyala
+            </button>
+            <a href="#" class="btn btn-sm btn-outline-light" id="downloadLogsBtn">
+                <i class="fas fa-download"></i> İndir
+            </a>
+            <button class="btn btn-sm btn-outline-light" id="toggleAutoScrollBtn">
+                <i class="fas fa-scroll"></i> Otomatik Kaydırma: Açık
+            </button>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div id="logsContainer" class="p-3 bg-dark" style="height: 500px; overflow-y: auto; font-family: monospace; white-space: pre-wrap; line-height: 1.5;">
+{{ logs }}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const logsContainer = document.getElementById('logsContainer');
+    const copyLogsBtn = document.getElementById('copyLogsBtn');
+    const downloadLogsBtn = document.getElementById('downloadLogsBtn');
+    const refreshLogsBtn = document.getElementById('refreshLogsBtn');
+    const toggleAutoScrollBtn = document.getElementById('toggleAutoScrollBtn');
+    
+    // Otomatik kaydırma durumu
+    let autoScroll = true;
+    
+    // Sayfayı yükledikten sonra en alta kaydır
+    logsContainer.scrollTop = logsContainer.scrollHeight;
+    
+    // Logları kopyala
+    copyLogsBtn.addEventListener('click', function() {
+        const logs = logsContainer.innerText;
+        navigator.clipboard.writeText(logs).then(function() {
+            alert('Loglar panoya kopyalandı!');
+        }, function() {
+            alert('Kopyalama başarısız oldu!');
+        });
+    });
+    
+    // Logları indir
+    downloadLogsBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        const logs = logsContainer.innerText;
+        const blob = new Blob([logs], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = '{{ container.name }}-logs.txt';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    });
+    
+    // Logları yenile
+    refreshLogsBtn.addEventListener('click', function() {
+        window.location.reload();
+    });
+    
+    // Otomatik kaydırmayı aç/kapat
+    toggleAutoScrollBtn.addEventListener('click', function() {
+        autoScroll = !autoScroll;
+        this.innerHTML = autoScroll 
+            ? '<i class="fas fa-scroll"></i> Otomatik Kaydırma: Açık' 
+            : '<i class="fas fa-scroll"></i> Otomatik Kaydırma: Kapalı';
+        
+        if (autoScroll) {
+            logsContainer.scrollTop = logsContainer.scrollHeight;
+        }
+    });
+});
+</script>
+{% endblock %} 

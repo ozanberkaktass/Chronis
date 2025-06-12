@@ -226,16 +226,72 @@ class DockerCLIClient:
             output = subprocess.check_output(cmd, universal_newlines=True)
             data = json.loads(output)[0]
             
+            # Durum bilgisini standardize et
+            status = data.get('State', {}).get('Status', '').lower()
+            if 'running' in status:
+                status_normalized = 'running'
+            elif 'exited' in status:
+                status_normalized = 'exited'
+            else:
+                status_normalized = status
+            
+            # Container ismini düzelt
+            name = data.get('Name', '').lstrip('/')
+            
+            # Image bilgisini al
+            image_tags = []
+            image_name = data.get('Config', {}).get('Image', '')
+            if image_name:
+                image_tags.append(image_name)
+            
+            # Port bilgilerini al
+            ports = []
+            ports_data = data.get('NetworkSettings', {}).get('Ports', {})
+            if ports_data:
+                for container_port, host_ports in ports_data.items():
+                    if host_ports:
+                        for binding in host_ports:
+                            ports.append(f"{binding.get('HostIp', '')}:{binding.get('HostPort', '')} -> {container_port}")
+                    else:
+                        ports.append(container_port)
+            
+            # Network bilgilerini al
+            networks = data.get('NetworkSettings', {}).get('Networks', {})
+            ip_address = "-"
+            if networks:
+                for net_name, net_data in networks.items():
+                    ip_address = net_data.get('IPAddress', '-')
+                    if ip_address and ip_address != '-':
+                        break
+            
+            # Çevre değişkenlerini al
+            env = data.get('Config', {}).get('Env', [])
+            
+            # Komut bilgisini al
+            command = data.get('Config', {}).get('Cmd', [])
+            if isinstance(command, list):
+                command = ' '.join(command)
+            
             container = type('obj', (object,), {
                 'id': data.get('Id', ''),
-                'name': data.get('Name', '').lstrip('/'),
-                'image': data.get('Config', {}).get('Image', ''),
-                'status': data.get('State', {}).get('Status', ''),
-                'created': data.get('Created', ''),
-                'ports': str(data.get('NetworkSettings', {}).get('Ports', {})),
-                'labels': data.get('Config', {}).get('Labels', {}),
-                'command': str(data.get('Config', {}).get('Cmd', [])),
-                'env': data.get('Config', {}).get('Env', [])
+                'short_id': data.get('Id', '')[:12],
+                'name': name,
+                'image': type('obj', (object,), {
+                    'tags': image_tags
+                }),
+                'status': status_normalized,
+                'command': command,
+                'created': data.get('Created', '').split('T')[0] if 'T' in data.get('Created', '') else data.get('Created', ''),
+                'ports': ports,
+                'env': env,
+                'attrs': {
+                    'Created': data.get('Created', ''),
+                    'State': data.get('State', {}),
+                    'Config': data.get('Config', {}),
+                    'NetworkSettings': {
+                        'Networks': networks
+                    }
+                }
             })
             
             return container
