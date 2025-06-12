@@ -607,6 +607,8 @@ def api_stats():
     try:
         # Şu anki sunucu saati
         now = datetime.datetime.now()
+        # Türkiye saati için 3 saat ekliyoruz
+        tr_now = now + datetime.timedelta(hours=3)
         
         stats = {
             'containers': {
@@ -621,23 +623,23 @@ def api_stats():
                 'cpu_usage': random.randint(10, 60),
                 'memory_usage': random.randint(20, 70),
                 'disk_usage': random.randint(30, 80),
-                'time': now.strftime('%H:%M:%S')
+                'time': tr_now.strftime('%H:%M:%S')
             },
             'events': [
                 {
-                    'time': now.strftime('%H:%M:%S'),
+                    'time': tr_now.strftime('%H:%M:%S'),
                     'event': 'Container başlatıldı',
                     'source': 'chronis',
                     'status': 'success'
                 },
                 {
-                    'time': (now - datetime.timedelta(minutes=2)).strftime('%H:%M:%S'),
+                    'time': (tr_now - datetime.timedelta(minutes=2)).strftime('%H:%M:%S'),
                     'event': 'Image indirildi',
                     'source': 'nginx:latest',
                     'status': 'success'
                 },
                 {
-                    'time': (now - datetime.timedelta(minutes=5)).strftime('%H:%M:%S'),
+                    'time': (tr_now - datetime.timedelta(minutes=5)).strftime('%H:%M:%S'),
                     'event': 'Container oluşturuldu',
                     'source': 'chronis',
                     'status': 'success'
