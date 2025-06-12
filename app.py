@@ -454,7 +454,7 @@ def dashboard():
         elif cli_client and cli_client.available:
             # CLI ile istatistikleri al
             containers = cli_client.containers_list(all=True)
-            running_containers = [c for c in containers if 'Up' in c.status]
+            running_containers = [c for c in containers if c.status == 'running']
             images = cli_client.images_list()
             volumes = cli_client.volumes_list()
             networks = cli_client.networks_list()
