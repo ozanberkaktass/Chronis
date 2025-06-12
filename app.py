@@ -15,6 +15,7 @@ import uuid
 import threading
 import eventlet
 from functools import wraps
+import traceback
 
 # WebSocket için eventlet'i kullan
 eventlet.monkey_patch()
@@ -30,8 +31,13 @@ static_dir = os.path.abspath('app/static')
 app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
 app.secret_key = "chronis_gizli_anahtar"  # Gerçek uygulamada değiştirin
 
+# Flask ayarları
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['DEBUG'] = True
+app.config['TEMPLATES_AUTO_RELOAD'] = True
+
 # Socket.IO
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet', ping_timeout=60)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet', ping_timeout=60, logger=True, engineio_logger=True)
 
 # Global değişken olarak Docker istemcisini tanımla
 client = None
@@ -1188,6 +1194,19 @@ def format_date(value, format='%Y-%m-%d %H:%M'):
                 return value
     return value.strftime(format)
 
-if __name__ == "__main__":
-    connect_to_docker()
-    socketio.run(app, host='0.0.0.0', port=5000, debug=True, allow_unsafe_werkzeug=True) 
+# Ana döngü
+if __name__ == '__main__':
+    try:
+        print("Chronis uygulaması başlatılıyor...")
+        import eventlet.wsgi
+        from eventlet import wsgi
+        
+        # Docker'a bağlan
+        connect_to_docker()
+        
+        # allow_unsafe_werkzeug parametresini kullanmadan başlat
+        # eventlet.wsgi.server yerine doğrudan socketio.run kullan
+        socketio.run(app, host='0.0.0.0', port=5000, debug=True)
+    except Exception as e:
+        print(f"Hata: {e}")
+        traceback.print_exc() 
