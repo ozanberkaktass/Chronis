@@ -742,6 +742,11 @@ def delete_terminal_recording(recording_id):
     else:
         return jsonify({'error': 'Kayıt bulunamadı'}), 404
 
+# Terminal2 sayfası
+@app.route('/terminal2')
+def terminal2():
+    return render_template('terminal2.html')
+
 # Ana fonksiyonlar
 @app.route('/')
 def index():
