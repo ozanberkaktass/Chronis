@@ -352,66 +352,22 @@ class DockerCLIClient:
             raise Exception(f"Container logları alınamadı: {e}")
 
 # Docker bağlantısını birkaç kez deneme
-def connect_to_docker(max_attempts=5, delay=2):
+def connect_to_docker(max_attempts=1, delay=1):
     global client, cli_client
     
-    # Önce CLI istemcisini başlat
-    cli_client = DockerCLIClient()
-    
-    for attempt in range(max_attempts):
-        try:
-            # Docker socket yolları
-            possible_paths = [
-                '/var/run/docker.sock',
-                '/run/docker.sock',
-                '/tmp/docker.sock'
-            ]
-            
-            # Docker host ortam değişkeni - burada direkt unix:// protokolü ile socket'i tanımlıyoruz
-            # DOCKER_HOST değişkeni kullanmak yerine doğrudan socket'e bağlanma yaklaşımı
-            for socket_path in possible_paths:
-                if os.path.exists(socket_path):
-                    print(f"Socket yolu bulundu: {socket_path}")
-                    try:
-                        # Direkt socket yolunu kullanarak bağlan
-                        client = docker.DockerClient(base_url=f"unix://{socket_path}")
-                        # Bağlantıyı test et
-                        version = client.version()
-                        print(f"Bağlantı başarılı. Docker versiyonu: {version.get('Version', 'bilinmiyor')}")
-                        return True
-                    except Exception as e:
-                        print(f"Socket yolu {socket_path} üzerinden bağlantı başarısız: {e}")
-                        continue
-            
-            # Alternatif olarak from_env kullanarak dene
-            try:
-                print("docker.from_env() ile bağlanmayı deniyorum...")
-                client = docker.from_env()
-                version = client.version()
-                print(f"from_env ile bağlantı başarılı. Docker versiyonu: {version.get('Version', 'bilinmiyor')}")
-                return True
-            except Exception as e:
-                print(f"from_env ile bağlantı başarısız: {e}")
-            
-            # Docker CLI bağlantısını kontrol et
-            if cli_client.available:
-                print("Docker CLI bağlantısı kullanılacak")
-                # Python istemcisi başarısız olsa da CLI istemcisi kullanılabilir
-            else:
-                print("Docker CLI erişimi başarısız")
-            
-            print(f"Deneme {attempt+1}/{max_attempts} başarısız, {delay} saniye bekleyip tekrar deneniyor...")
-            time.sleep(delay)
+    try:
+        # Önce CLI istemcisini başlat
+        cli_client = DockerCLIClient()
         
-        except Exception as e:
-            print(f"Deneme {attempt+1}/{max_attempts} sırasında hata: {e}")
-            time.sleep(delay)
-    
-    if cli_client.available:
-        print("Docker Python istemcisi başarısız, CLI istemcisi ile devam ediliyor.")
-        return True
-    else:
-        print("Docker bağlantısı kurulamadı. Sınırlı işlevsellikle devam ediliyor.")
+        # Docker CLI bağlantısını kontrol et
+        if cli_client.available:
+            print("Docker CLI bağlantısı kullanılacak")
+            return True
+        else:
+            print("Docker CLI erişimi başarısız, sınırlı işlevsellikle devam ediliyor.")
+            return False
+    except Exception as e:
+        print(f"Docker bağlantısı sırasında hata: {e}")
         return False
 
 # Uygulama başlangıcında Docker'a bağlan
